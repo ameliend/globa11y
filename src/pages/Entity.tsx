@@ -1,0 +1,223 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Plus, ArrowLeft, Trash2, Edit } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Site {
+  id: string;
+  name: string;
+  url: string;
+  latest_score?: number;
+}
+
+const Entity = () => {
+  const { entityId } = useParams();
+  const navigate = useNavigate();
+  const [entity, setEntity] = useState<any>(null);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [open, setOpen] = useState(false);
+  const [siteName, setSiteName] = useState('');
+  const [siteUrl, setSiteUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchEntity();
+    fetchSites();
+  }, [entityId]);
+
+  const fetchEntity = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('entities')
+        .select('*')
+        .eq('id', entityId)
+        .single();
+
+      if (error) throw error;
+      setEntity(data);
+    } catch (error: any) {
+      toast.error('Failed to fetch entity');
+    }
+  };
+
+  const fetchSites = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('sites')
+        .select('*')
+        .eq('entity_id', entityId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setSites(data || []);
+    } catch (error: any) {
+      toast.error('Failed to fetch sites');
+    }
+  };
+
+  const handleCreateSite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!siteName.trim() || !siteUrl.trim()) {
+      toast.error('Please fill all fields');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('sites')
+        .insert([{ name: siteName, url: siteUrl, entity_id: entityId }]);
+
+      if (error) throw error;
+
+      toast.success('Site added successfully');
+      setSiteName('');
+      setSiteUrl('');
+      setOpen(false);
+      fetchSites();
+    } catch (error: any) {
+      toast.error('Failed to add site');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteEntity = async () => {
+    if (!confirm('Are you sure you want to delete this entity? This will delete all associated sites and reports.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('entities')
+        .delete()
+        .eq('id', entityId);
+
+      if (error) throw error;
+
+      toast.success('Entity deleted successfully');
+      navigate('/');
+    } catch (error: any) {
+      toast.error('Failed to delete entity');
+    }
+  };
+
+  if (!entity) return null;
+
+  return (
+    <div className="container mx-auto py-8 px-4">
+      <Button
+        variant="ghost"
+        className="mb-6"
+        onClick={() => navigate('/')}
+      >
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back to Entities
+      </Button>
+
+      <div className="flex justify-between items-start mb-8">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">{entity.name}</h1>
+          <p className="text-muted-foreground">Audited Sites: {sites.length}</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleDeleteEntity}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Site to Audit
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Site to Audit</DialogTitle>
+                <DialogDescription>
+                  Add a new website to audit for this entity
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreateSite} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="site-name">Site Name</Label>
+                  <Input
+                    id="site-name"
+                    placeholder="Homepage"
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="site-url">Site URL</Label>
+                  <Input
+                    id="site-url"
+                    type="url"
+                    placeholder="https://example.com"
+                    value={siteUrl}
+                    onChange={(e) => setSiteUrl(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => setOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={loading}>
+                    Add Site
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {sites.length === 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>No Sites Yet</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">
+              Add your first site to start creating accessibility audits
+            </p>
+            <Button onClick={() => setOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add First Site
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {sites.map((site) => (
+            <Card
+              key={site.id}
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => navigate(`/site/${site.id}`)}
+            >
+              <CardHeader>
+                <CardTitle className="text-xl">{site.name}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-2">{site.url}</p>
+                {site.latest_score !== undefined && (
+                  <p className="text-sm font-medium">
+                    Latest Score: {Math.round(site.latest_score)}%
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Entity;
