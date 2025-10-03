@@ -35,11 +35,17 @@ const EntitiesNew = () => {
     try {
       const { data, error } = await supabase
         .from('entities')
-        .select('*')
+        .select('*, sites(id)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setEntities(data || []);
+
+      const entitiesWithCount = data?.map((entity: any) => ({
+        ...entity,
+        sites_count: entity.sites?.length || 0,
+      })) || [];
+
+      setEntities(entitiesWithCount);
     } catch (error: any) {
       toast.error('Failed to fetch entities');
     }
@@ -142,10 +148,7 @@ const EntitiesNew = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm text-muted-foreground">
-                  <p>Sites: {entity.sites_count || 0}</p>
-                  {entity.average_score !== undefined && (
-                    <p>Average Score: {Math.round(entity.average_score)}%</p>
-                  )}
+                  <p>Audited Sites: {entity.sites_count || 0}</p>
                 </div>
               </CardContent>
             </Card>

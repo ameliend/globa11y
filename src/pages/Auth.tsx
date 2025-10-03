@@ -6,14 +6,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { Globa11yLogo } from '@/components/Globa11yLogo';
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, user } = useAuth();
   const navigate = useNavigate();
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -26,16 +28,36 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { error } = isLogin
-        ? await signIn(email, password)
-        : await signUp(email, password);
+      const { error } = await signIn(email, password);
 
       if (error) {
         toast.error(error.message);
       } else {
-        toast.success(isLogin ? 'Signed in successfully' : 'Account created successfully');
+        toast.success('Signed in successfully');
         navigate('/');
       }
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      toast.error('Please enter your email address');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth`,
+      });
+
+      if (error) throw error;
+      toast.success('Password reset email sent! Check your inbox.');
+      setShowForgotPassword(false);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -47,11 +69,14 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
+          <div className="flex justify-center mb-4">
+            <Globa11yLogo />
+          </div>
           <CardTitle className="text-2xl font-bold text-center">
-            CANAL+ Accessible
+            Sign In
           </CardTitle>
           <CardDescription className="text-center">
-            {isLogin ? 'Sign in to your account' : 'Create a new account'}
+            Sign in to your account
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -80,19 +105,41 @@ const Auth = () => {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Loading...' : isLogin ? 'Sign In' : 'Sign Up'}
+              {loading ? 'Loading...' : 'Sign In'}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm">
-            {isLogin ? "Don't have an account? " : 'Already have an account? '}
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-primary hover:underline"
-            >
-              {isLogin ? 'Sign up' : 'Sign in'}
-            </button>
-          </div>
+          {!showForgotPassword ? (
+            <div className="mt-4 text-center text-sm">
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-primary hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-2">
+              <p className="text-sm text-center text-muted-foreground">
+                Enter your email to receive a password reset link
+              </p>
+              <Button
+                onClick={handleForgotPassword}
+                variant="outline"
+                className="w-full"
+                disabled={loading}
+              >
+                Send Reset Link
+              </Button>
+              <Button
+                onClick={() => setShowForgotPassword(false)}
+                variant="ghost"
+                className="w-full"
+              >
+                Back to Sign In
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

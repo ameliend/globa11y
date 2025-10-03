@@ -13,6 +13,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { wcagCriteria } from '@/data/wcagCriteria';
 import wcagFullData from '@/data/wcag-full.json';
+import { howToTest } from '@/data/howToTest';
+import { Collapsible as CollapsiblePrimitive, CollapsibleContent as CollapsibleContentPrimitive, CollapsibleTrigger as CollapsibleTriggerPrimitive } from '@/components/ui/collapsible';
 
 interface CriteriaStatus {
   id: string;
@@ -176,7 +178,11 @@ const AuditNew = () => {
       setPageName('');
       setSelectedPageToDuplicate('');
       setShowDuplicateOption(false);
-      fetchReport();
+      await fetchReport();
+      
+      // Navigate to the newly created page
+      const newPageIndex = pages.length;
+      setCurrentPageIndex(newPageIndex);
     } catch (error: any) {
       toast.error('Failed to add page');
     }
@@ -207,10 +213,7 @@ const AuditNew = () => {
       };
       findWcagTags(data);
 
-      if (wcagTags.length === 0) {
-        toast.info('No WCAG criteria found in JSON');
-        return;
-      }
+      const targetCodes = ['1.1.1', '1.3.1', '1.3.2', '1.3.3', '1.3.5', '1.4.1', '1.4.3', '1.4.4', '1.4.12', '2.1.1', '2.2.1', '2.2.2', '2.4.2', '2.4.3', '2.4.4', '2.4.7', '2.5.8', '3.1.1', '3.1.2', '4.1.2'];
 
       if (pages.length === 0 || currentPageIndex >= pages.length) {
         toast.error('Please create a page first');
@@ -218,27 +221,29 @@ const AuditNew = () => {
       }
 
       const currentPage = pages[currentPageIndex];
-      const updates = currentPage.criteria.map((criterion) => {
-        const matchingTag = wcagTags.find(tag => tag === criterion.code);
-        if (matchingTag) {
-          return { ...criterion, status: 'non-compliant' as const };
+      const updates: any[] = [];
+
+      currentPage.criteria.forEach((criterion) => {
+        if (targetCodes.includes(criterion.code)) {
+          const isInJson = wcagTags.includes(criterion.code);
+          const newStatus = isInJson ? 'non-compliant' : 'compliant';
+          updates.push({ code: criterion.code, status: newStatus });
+        } else if (wcagTags.includes(criterion.code)) {
+          updates.push({ code: criterion.code, status: 'non-compliant' });
         }
-        return criterion;
       });
 
       await Promise.all(
-        updates
-          .filter((c) => wcagTags.includes(c.code))
-          .map((c) =>
-            supabase
-              .from('criteria_results')
-              .update({ status: 'non-compliant' })
-              .eq('page_id', currentPage.id)
-              .eq('code', c.code)
-          )
+        updates.map((u) =>
+          supabase
+            .from('criteria_results')
+            .update({ status: u.status })
+            .eq('page_id', currentPage.id)
+            .eq('code', u.code)
+        )
       );
 
-      toast.success(`Updated ${wcagTags.length} criteria to non-compliant`);
+      toast.success(`Updated ${updates.length} criteria based on JSON`);
       fetchReport();
     } catch (error: any) {
       toast.error('Failed to import JSON');
@@ -442,12 +447,22 @@ const AuditNew = () => {
                                         Level {criterion.level}
                                       </span>
                                     </h4>
-                                    {criterion.description && (
-                                      <p className="text-sm text-muted-foreground mt-1">
-                                        {criterion.description}
-                                      </p>
-                                    )}
-                                  </div>
+                                     {criterion.description && (
+                                       <p className="text-sm text-muted-foreground mt-1">
+                                         {criterion.description}
+                                       </p>
+                                     )}
+                                     {howToTest[criterion.code] && (
+                                       <CollapsiblePrimitive className="mt-2">
+                                         <CollapsibleTriggerPrimitive className="flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+                                           How to test
+                                         </CollapsibleTriggerPrimitive>
+                                         <CollapsibleContentPrimitive className="mt-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded">
+                                           {howToTest[criterion.code]}
+                                         </CollapsibleContentPrimitive>
+                                       </CollapsiblePrimitive>
+                                     )}
+                                   </div>
 
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>

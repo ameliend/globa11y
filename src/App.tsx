@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Header } from "@/components/Header";
+import { AIChat } from "@/components/AIChat";
 import Auth from "./pages/Auth";
 import EntitiesNew from "./pages/EntitiesNew";
 import Entity from "./pages/Entity";
@@ -15,6 +16,7 @@ import AuditNew from "./pages/AuditNew";
 import ResultsNew from "./pages/ResultsNew";
 import MyAccount from "./pages/MyAccount";
 import RolesUsers from "./pages/RolesUsers";
+import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,8 +45,10 @@ const App = () => (
                       <Route path="/results/:reportId" element={<ResultsNew />} />
                       <Route path="/my-account" element={<MyAccount />} />
                       <Route path="/roles-users" element={<RolesUsers />} />
+                      <Route path="/contact" element={<Contact />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
+                    <AIChat />
                   </div>
                 </ProtectedRoute>
               }

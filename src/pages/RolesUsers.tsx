@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Trash2 } from 'lucide-react';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
 interface UserRole {
   id: string;
@@ -16,16 +18,42 @@ interface UserRole {
   email: string;
 }
 
+interface Entity {
+  id: string;
+  name: string;
+}
+
 const RolesUsers = () => {
   const { user } = useAuth();
   const [users, setUsers] = useState<UserRole[]>([]);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState<'owner' | 'editor' | 'reader'>('reader');
+  const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
+  const [entities, setEntities] = useState<Entity[]>([]);
   const [loading, setLoading] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; userId: string | null }>({
+    open: false,
+    userId: null,
+  });
 
   useEffect(() => {
     fetchUsers();
+    fetchEntities();
   }, []);
+
+  const fetchEntities = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('entities')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setEntities(data || []);
+    } catch (error: any) {
+      toast.error('Failed to fetch entities');
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -58,9 +86,21 @@ const RolesUsers = () => {
     setLoading(true);
 
     try {
-      // This is a simplified version - in production, you'd need a backend function
-      // to invite users and assign roles properly
-      toast.info('User invitation feature requires backend implementation');
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: newUserEmail,
+          role: newUserRole,
+          entityIds: selectedEntities,
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success('User created successfully with default password: intracanal+');
+      setNewUserEmail('');
+      setNewUserRole('reader');
+      setSelectedEntities([]);
+      fetchUsers();
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -68,20 +108,29 @@ const RolesUsers = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
+  const handleDeleteUser = async () => {
+    if (!deleteDialog.userId) return;
+
     try {
       const { error } = await supabase
         .from('user_roles')
         .delete()
-        .eq('id', userId);
+        .eq('id', deleteDialog.userId);
 
       if (error) throw error;
 
       toast.success('User removed successfully');
+      setDeleteDialog({ open: false, userId: null });
       fetchUsers();
     } catch (error: any) {
       toast.error('Failed to remove user');
     }
+  };
+
+  const toggleEntitySelection = (entityId: string) => {
+    setSelectedEntities((prev) =>
+      prev.includes(entityId) ? prev.filter((id) => id !== entityId) : [...prev, entityId]
+    );
   };
 
   return (
@@ -120,6 +169,29 @@ const RolesUsers = () => {
                 </Select>
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>Entity Permissions</Label>
+              <div className="border rounded-lg p-4 max-h-48 overflow-y-auto space-y-2">
+                {entities.map((entity) => (
+                  <div key={entity.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={entity.id}
+                      checked={selectedEntities.includes(entity.id)}
+                      onCheckedChange={() => toggleEntitySelection(entity.id)}
+                    />
+                    <label
+                      htmlFor={entity.id}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      {entity.name}
+                    </label>
+                  </div>
+                ))}
+                {entities.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No entities available</p>
+                )}
+              </div>
+            </div>
             <Button type="submit" disabled={loading}>
               {loading ? 'Adding...' : 'Add User'}
             </Button>
@@ -146,7 +218,7 @@ const RolesUsers = () => {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleDeleteUser(usr.id)}
+                    onClick={() => setDeleteDialog({ open: true, userId: usr.id })}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -167,7 +239,19 @@ const RolesUsers = () => {
           <li><strong>Editor:</strong> Can edit site information and reports, but cannot manage users</li>
           <li><strong>Reader:</strong> Read-only access to view reports and results</li>
         </ul>
+        <div className="mt-4 p-3 bg-background border border-border rounded">
+          <p className="text-sm font-medium">Default Password</p>
+          <p className="text-sm text-muted-foreground">All new users are created with password: <code className="font-mono bg-muted px-1">intracanal+</code></p>
+        </div>
       </div>
+
+      <DeleteConfirmDialog
+        open={deleteDialog.open}
+        onOpenChange={(open) => setDeleteDialog({ open, userId: null })}
+        onConfirm={handleDeleteUser}
+        title="Delete User?"
+        description="This will remove the user and all their permissions. This action cannot be undone."
+      />
     </div>
   );
 };

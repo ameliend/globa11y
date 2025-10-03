@@ -7,7 +7,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { User, Users, LogOut } from 'lucide-react';
+import { User, Users, LogOut, Mail } from 'lucide-react';
+import { Globa11yLogo } from '@/components/Globa11yLogo';
 
 export const Header = () => {
   const { user, signOut } = useAuth();
@@ -21,8 +22,8 @@ export const Header = () => {
   return (
     <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link to="/" className="text-xl font-bold text-primary hover:opacity-80 transition-opacity">
-          CANAL+ Accessible
+        <Link to="/" className="hover:opacity-80 transition-opacity">
+          <Globa11yLogo />
         </Link>
         
         {user && (
@@ -40,6 +41,10 @@ export const Header = () => {
               <DropdownMenuItem onClick={() => navigate('/roles-users')}>
                 <Users className="mr-2 h-4 w-4" />
                 Roles & Users
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/contact')}>
+                <Mail className="mr-2 h-4 w-4" />
+                Contact
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleSignOut}>
                 <LogOut className="mr-2 h-4 w-4" />

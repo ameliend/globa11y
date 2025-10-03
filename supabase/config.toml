@@ -1,1 +1,7 @@
 project_id = "macstakqnfwffcwcgrtf"
+
+[functions.accessibility-chat]
+verify_jwt = true
+
+[functions.create-user]
+verify_jwt = true
