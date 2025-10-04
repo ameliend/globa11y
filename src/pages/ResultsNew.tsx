@@ -140,7 +140,7 @@ const ResultsNew = () => {
             <CardTitle>Overall Score</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-5xl font-bold text-primary">
+            <p className="text-5xl font-bold text-foreground">
               {Math.round(report.score || 0)}%
             </p>
           </CardContent>

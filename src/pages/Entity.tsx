@@ -48,14 +48,35 @@ const Entity = () => {
 
   const fetchSites = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: sitesData, error } = await supabase
         .from('sites')
         .select('*')
         .eq('entity_id', entityId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setSites(data || []);
+
+      // For each site, fetch the latest completed report score
+      const sitesWithScores = await Promise.all(
+        (sitesData || []).map(async (site) => {
+          const { data: reportData } = await supabase
+            .from('reports')
+            .select('score')
+            .eq('site_id', site.id)
+            .eq('status', 'completed')
+            .not('score', 'is', null)
+            .order('start_date', { ascending: false })
+            .limit(1)
+            .single();
+
+          return {
+            ...site,
+            latest_score: reportData?.score,
+          };
+        })
+      );
+
+      setSites(sitesWithScores);
     } catch (error: any) {
       toast.error('Failed to fetch sites');
     }
@@ -206,9 +227,13 @@ const Entity = () => {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-2">{site.url}</p>
-                {site.latest_score !== undefined && (
-                  <p className="text-sm font-medium">
-                    Latest Score: {Math.round(site.latest_score)}%
+                {site.latest_score !== undefined ? (
+                  <p className="text-sm font-medium text-foreground">
+                    Score: {Math.round(site.latest_score)}%
+                  </p>
+                ) : (
+                  <p className="text-sm font-medium text-muted-foreground">
+                    A auditer
                   </p>
                 )}
               </CardContent>

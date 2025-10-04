@@ -196,6 +196,13 @@ const AuditNew = () => {
       const text = await file.text();
       const data = JSON.parse(text);
 
+      // List of criteria that can be automatically filled
+      const autoFillCriteria = [
+        '1.1.1', '1.3.1', '1.3.2', '1.3.3', '1.3.5', '1.4.1', '1.4.3', '1.4.4', '1.4.12',
+        '2.1.1', '2.2.1', '2.2.2', '2.4.2', '2.4.3', '2.4.4', '2.4.7', '2.5.8',
+        '3.1.1', '3.1.2', '4.1.2'
+      ];
+
       const wcagTags: string[] = [];
       const findWcagTags = (obj: any) => {
         if (Array.isArray(obj)) {
@@ -213,8 +220,6 @@ const AuditNew = () => {
       };
       findWcagTags(data);
 
-      const targetCodes = ['1.1.1', '1.3.1', '1.3.2', '1.3.3', '1.3.5', '1.4.1', '1.4.3', '1.4.4', '1.4.12', '2.1.1', '2.2.1', '2.2.2', '2.4.2', '2.4.3', '2.4.4', '2.4.7', '2.5.8', '3.1.1', '3.1.2', '4.1.2'];
-
       if (pages.length === 0 || currentPageIndex >= pages.length) {
         toast.error('Please create a page first');
         return;
@@ -224,12 +229,15 @@ const AuditNew = () => {
       const updates: any[] = [];
 
       currentPage.criteria.forEach((criterion) => {
-        if (targetCodes.includes(criterion.code)) {
-          const isInJson = wcagTags.includes(criterion.code);
-          const newStatus = isInJson ? 'non-compliant' : 'compliant';
-          updates.push({ code: criterion.code, status: newStatus });
-        } else if (wcagTags.includes(criterion.code)) {
-          updates.push({ code: criterion.code, status: 'non-compliant' });
+        // Only update criteria in the auto-fill list
+        if (autoFillCriteria.includes(criterion.code)) {
+          if (wcagTags.includes(criterion.code)) {
+            // Present in JSON = non-compliant
+            updates.push({ code: criterion.code, status: 'non-compliant' });
+          } else {
+            // Not present in JSON = compliant
+            updates.push({ code: criterion.code, status: 'compliant' });
+          }
         }
       });
 
@@ -243,7 +251,10 @@ const AuditNew = () => {
         )
       );
 
-      toast.success(`Updated ${updates.length} criteria based on JSON`);
+      const nonCompliantCount = updates.filter(u => u.status === 'non-compliant').length;
+      const compliantCount = updates.filter(u => u.status === 'compliant').length;
+
+      toast.success(`Updated ${autoFillCriteria.length} criteria: ${nonCompliantCount} non-compliant, ${compliantCount} compliant`);
       fetchReport();
     } catch (error: any) {
       toast.error('Failed to import JSON');

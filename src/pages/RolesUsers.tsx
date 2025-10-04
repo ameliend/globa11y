@@ -14,7 +14,7 @@ import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 interface UserRole {
   id: string;
   user_id: string;
-  role: 'owner' | 'editor' | 'reader';
+  role: 'owner' | 'editor' | 'reader' | string;
   email: string;
 }
 
@@ -57,26 +57,38 @@ const RolesUsers = () => {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch all profiles
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, email, created_at')
+        .order('created_at', { ascending: false });
+
+      if (profilesError) throw profilesError;
+
+      // Fetch user roles
+      const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
-        .select(`
-          id,
-          user_id,
-          role,
-          profiles!inner(email)
-        `);
+        .select('*');
 
-      if (error) throw error;
+      if (rolesError) throw rolesError;
 
-      const formattedUsers = data?.map((item: any) => ({
-        id: item.id,
-        user_id: item.user_id,
-        role: item.role,
-        email: item.profiles?.email || 'Unknown',
+      // Create a map of user roles
+      const rolesMap: Record<string, string> = {};
+      rolesData?.forEach((role: any) => {
+        rolesMap[role.user_id] = role.role;
+      });
+
+      // Combine profiles with roles
+      const formattedUsers = profilesData?.map((profile: any) => ({
+        id: profile.id,
+        user_id: profile.id,
+        role: rolesMap[profile.id] || 'No role assigned',
+        email: profile.email,
       })) || [];
 
       setUsers(formattedUsers);
     } catch (error: any) {
+      console.error('Failed to fetch users:', error);
       toast.error('Failed to fetch users');
     }
   };

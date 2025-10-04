@@ -19,6 +19,7 @@ All colors MUST be HSL.
 
     --primary: 348 82% 52%;
     --primary-foreground: 0 0% 100%;
+    --primary-hover: 348 82% 45%;
 
     --secondary: 210 16% 93%;
     --secondary-foreground: 215 25% 15%;
@@ -106,5 +107,15 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  a {
+    text-decoration: underline;
+    text-decoration-color: hsl(var(--primary));
+    text-underline-offset: 2px;
+  }
+
+  a:hover {
+    text-decoration-color: hsl(var(--primary-hover));
   }
 }
