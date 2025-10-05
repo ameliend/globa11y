@@ -14,15 +14,35 @@ serve(async (req) => {
   try {
     const { email, role, entityIds = [] } = await req.json();
     
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid email address' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Create user with default password
+    // Generate a secure random password (16 characters with mixed case, numbers, and symbols)
+    const generateSecurePassword = () => {
+      const length = 16;
+      const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+      const array = new Uint8Array(length);
+      crypto.getRandomValues(array);
+      return Array.from(array, byte => charset[byte % charset.length]).join('');
+    };
+
+    const temporaryPassword = generateSecurePassword();
+
+    // Create user with temporary random password
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: 'intracanal+',
+      password: temporaryPassword,
       email_confirm: true,
     });
 
@@ -46,11 +66,25 @@ serve(async (req) => {
         .from('user_entity_permissions')
         .insert(permissions);
 
-      if (permError) throw permError;
+    if (permError) throw permError;
+    }
+
+    // Send password reset email to allow user to set their own password
+    const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+      redirectTo: `${req.headers.get('origin')}/auth`,
+    });
+
+    if (resetError) {
+      console.error('Password reset email error:', resetError);
+      // Don't fail the user creation, just log the error
     }
 
     return new Response(
-      JSON.stringify({ success: true, userId: userData.user.id }),
+      JSON.stringify({ 
+        success: true, 
+        userId: userData.user.id,
+        message: 'User created successfully. Password reset email sent.'
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

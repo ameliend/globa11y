@@ -6,6 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { z } from 'zod';
+
+const passwordSchema = z
+  .string()
+  .min(12, 'Password must be at least 12 characters')
+  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+  .regex(/[0-9]/, 'Password must contain at least one number')
+  .regex(/[^a-zA-Z0-9]/, 'Password must contain at least one special character');
 
 const MyAccount = () => {
   const { user } = useAuth();
@@ -17,8 +26,11 @@ const MyAccount = () => {
     setLoading(true);
 
     try {
+      // Validate password strength
+      const validatedPassword = passwordSchema.parse(newPassword);
+      
       const { error } = await supabase.auth.updateUser({
-        password: newPassword,
+        password: validatedPassword,
       });
 
       if (error) throw error;
@@ -26,7 +38,11 @@ const MyAccount = () => {
       toast.success('Password updated successfully');
       setNewPassword('');
     } catch (error: any) {
-      toast.error(error.message);
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -63,8 +79,16 @@ const MyAccount = () => {
                 placeholder="••••••••"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                minLength={6}
+                minLength={12}
               />
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>Password must contain:</p>
+                <ul className="list-disc list-inside ml-2">
+                  <li>At least 12 characters</li>
+                  <li>One uppercase and one lowercase letter</li>
+                  <li>One number and one special character</li>
+                </ul>
+              </div>
             </div>
             <Button type="submit" disabled={loading || !newPassword}>
               {loading ? 'Updating...' : 'Update Password'}

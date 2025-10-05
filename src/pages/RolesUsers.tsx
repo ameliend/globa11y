@@ -108,7 +108,7 @@ const RolesUsers = () => {
 
       if (error) throw error;
 
-      toast.success('User created successfully with default password: intracanal+');
+      toast.success(data.message || 'User created successfully. Password reset email sent.');
       setNewUserEmail('');
       setNewUserRole('reader');
       setSelectedEntities([]);
@@ -252,8 +252,8 @@ const RolesUsers = () => {
           <li><strong>Reader:</strong> Read-only access to view reports and results</li>
         </ul>
         <div className="mt-4 p-3 bg-background border border-border rounded">
-          <p className="text-sm font-medium">Default Password</p>
-          <p className="text-sm text-muted-foreground">All new users are created with password: <code className="font-mono bg-muted px-1">intracanal+</code></p>
+          <p className="text-sm font-medium">Password Setup</p>
+          <p className="text-sm text-muted-foreground">New users will receive a password reset email to set up their own secure password.</p>
         </div>
       </div>
 

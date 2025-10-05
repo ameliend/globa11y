@@ -8,6 +8,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Globa11yLogo } from '@/components/Globa11yLogo';
+import { z } from 'zod';
+
+const authSchema = z.object({
+  email: z.string().email('Invalid email address').trim(),
+  password: z.string().min(8, 'Password must be at least 8 characters')
+});
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -28,7 +34,10 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { error } = await signIn(email, password);
+      // Validate inputs
+      const validatedData = authSchema.parse({ email, password });
+      
+      const { error } = await signIn(validatedData.email, validatedData.password);
 
       if (error) {
         toast.error(error.message);
@@ -37,21 +46,24 @@ const Auth = () => {
         navigate('/');
       }
     } catch (error: any) {
-      toast.error(error.message);
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleForgotPassword = async () => {
-    if (!email) {
-      toast.error('Please enter your email address');
-      return;
-    }
-
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      // Validate email
+      const emailSchema = z.string().email('Invalid email address').trim();
+      const validatedEmail = emailSchema.parse(email);
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(validatedEmail, {
         redirectTo: `${window.location.origin}/auth`,
       });
 
@@ -59,7 +71,11 @@ const Auth = () => {
       toast.success('Password reset email sent! Check your inbox.');
       setShowForgotPassword(false);
     } catch (error: any) {
-      toast.error(error.message);
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -101,8 +117,11 @@ const Auth = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={8}
               />
+              <p className="text-xs text-muted-foreground">
+                Minimum 8 characters required
+              </p>
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Loading...' : 'Sign In'}
