@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { wcagCriteria } from '@/data/wcagCriteria';
@@ -44,6 +45,11 @@ const AuditNew = () => {
   const [pageName, setPageName] = useState('');
   const [showDuplicateOption, setShowDuplicateOption] = useState(false);
   const [selectedPageToDuplicate, setSelectedPageToDuplicate] = useState<string>('');
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importResults, setImportResults] = useState<{
+    compliant: string[];
+    nonCompliant: string[];
+  }>({ compliant: [], nonCompliant: [] });
 
   useEffect(() => {
     fetchReport();
@@ -211,7 +217,10 @@ const AuditNew = () => {
           if (obj.tags && Array.isArray(obj.tags)) {
             obj.tags.forEach((tag: any) => {
               if (tag.id && tag.id.startsWith('WCAG-')) {
-                wcagTags.push(tag.id.replace('WCAG-', ''));
+                const code = tag.id.replace('WCAG-', '');
+                if (autoFillCriteria.includes(code)) {
+                  wcagTags.push(code);
+                }
               }
             });
           }
@@ -225,20 +234,35 @@ const AuditNew = () => {
         return;
       }
 
+      // Calculate compliant and non-compliant
+      const nonCompliant = wcagTags.filter((code, index, self) => self.indexOf(code) === index); // unique
+      const compliant = autoFillCriteria.filter(code => !nonCompliant.includes(code));
+
+      setImportResults({ compliant, nonCompliant });
+      setShowImportDialog(true);
+    } catch (error: any) {
+      toast.error('Failed to parse JSON file');
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    try {
       const currentPage = pages[currentPageIndex];
       const updates: any[] = [];
 
-      currentPage.criteria.forEach((criterion) => {
-        // Only update criteria in the auto-fill list
-        if (autoFillCriteria.includes(criterion.code)) {
-          if (wcagTags.includes(criterion.code)) {
-            // Present in JSON = non-compliant
-            updates.push({ code: criterion.code, status: 'non-compliant' });
-          } else {
-            // Not present in JSON = compliant
-            updates.push({ code: criterion.code, status: 'compliant' });
-          }
-        }
+      // Update non-compliant criteria
+      importResults.nonCompliant.forEach((code) => {
+        updates.push({ code, status: 'non-compliant' });
+      });
+
+      // Update compliant criteria
+      importResults.compliant.forEach((code) => {
+        updates.push({ code, status: 'compliant' });
       });
 
       await Promise.all(
@@ -251,13 +275,12 @@ const AuditNew = () => {
         )
       );
 
-      const nonCompliantCount = updates.filter(u => u.status === 'non-compliant').length;
-      const compliantCount = updates.filter(u => u.status === 'compliant').length;
-
-      toast.success(`Updated ${autoFillCriteria.length} criteria: ${nonCompliantCount} non-compliant, ${compliantCount} compliant`);
+      toast.success(`Updated ${updates.length} criteria from JSON import`);
+      setShowImportDialog(false);
+      setImportResults({ compliant: [], nonCompliant: [] });
       fetchReport();
     } catch (error: any) {
-      toast.error('Failed to import JSON');
+      toast.error('Failed to apply import');
     }
   };
 
@@ -465,7 +488,7 @@ const AuditNew = () => {
                                      )}
                                      {howToTest[criterion.code] && (
                                        <CollapsiblePrimitive className="mt-2">
-                                         <CollapsibleTriggerPrimitive className="flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+                                         <CollapsibleTriggerPrimitive className="flex items-center gap-2 text-sm font-medium text-primary underline">
                                            How to test
                                          </CollapsibleTriggerPrimitive>
                                          <CollapsibleContentPrimitive className="mt-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded">
@@ -571,6 +594,62 @@ const AuditNew = () => {
           </div>
         </div>
       )}
+
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import JSON Results</DialogTitle>
+            <DialogDescription>
+              Review the criteria detected from the JSON file before applying changes.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            <div>
+              <h3 className="font-semibold text-destructive mb-3 flex items-center gap-2">
+                <XCircle className="h-5 w-5" />
+                Non-Compliant Criteria ({importResults.nonCompliant.length})
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {importResults.nonCompliant.map((code) => (
+                  <div key={code} className="text-sm bg-destructive/10 px-3 py-2 rounded border border-destructive/20">
+                    {code}
+                  </div>
+                ))}
+                {importResults.nonCompliant.length === 0 && (
+                  <p className="text-sm text-muted-foreground col-span-full">No non-compliant criteria found</p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-success mb-3 flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5" />
+                Compliant Criteria ({importResults.compliant.length})
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {importResults.compliant.map((code) => (
+                  <div key={code} className="text-sm bg-success/10 px-3 py-2 rounded border border-success/20">
+                    {code}
+                  </div>
+                ))}
+                {importResults.compliant.length === 0 && (
+                  <p className="text-sm text-muted-foreground col-span-full">No compliant criteria found</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImportDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmImport}>
+              Apply Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Pencil } from 'lucide-react';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
 interface UserRole {
@@ -35,6 +36,12 @@ const RolesUsers = () => {
     open: false,
     userId: null,
   });
+  const [editDialog, setEditDialog] = useState<{
+    open: boolean;
+    user: UserRole | null;
+  }>({ open: false, user: null });
+  const [editRole, setEditRole] = useState<'owner' | 'editor' | 'reader'>('reader');
+  const [editEntities, setEditEntities] = useState<string[]>([]);
 
   useEffect(() => {
     fetchUsers();
@@ -145,6 +152,75 @@ const RolesUsers = () => {
     );
   };
 
+  const toggleEditEntitySelection = (entityId: string) => {
+    setEditEntities((prev) =>
+      prev.includes(entityId) ? prev.filter((id) => id !== entityId) : [...prev, entityId]
+    );
+  };
+
+  const handleOpenEditDialog = async (user: UserRole) => {
+    try {
+      // Fetch user's current role
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.user_id)
+        .single();
+
+      // Fetch user's entity permissions
+      const { data: permissionsData } = await supabase
+        .from('user_entity_permissions')
+        .select('entity_id')
+        .eq('user_id', user.user_id);
+
+      setEditRole(roleData?.role || 'reader');
+      setEditEntities(permissionsData?.map((p: any) => p.entity_id) || []);
+      setEditDialog({ open: true, user });
+    } catch (error: any) {
+      toast.error('Failed to load user data');
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editDialog.user) return;
+
+    try {
+      // Update role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .update({ role: editRole })
+        .eq('user_id', editDialog.user.user_id);
+
+      if (roleError) throw roleError;
+
+      // Delete existing permissions
+      await supabase
+        .from('user_entity_permissions')
+        .delete()
+        .eq('user_id', editDialog.user.user_id);
+
+      // Insert new permissions
+      if (editEntities.length > 0) {
+        const { error: permError } = await supabase
+          .from('user_entity_permissions')
+          .insert(
+            editEntities.map((entityId) => ({
+              user_id: editDialog.user!.user_id,
+              entity_id: entityId,
+            }))
+          );
+
+        if (permError) throw permError;
+      }
+
+      toast.success('User updated successfully');
+      setEditDialog({ open: false, user: null });
+      fetchUsers();
+    } catch (error: any) {
+      toast.error('Failed to update user');
+    }
+  };
+
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">
       <h1 className="text-3xl font-bold mb-8">Roles & Users</h1>
@@ -227,13 +303,22 @@ const RolesUsers = () => {
                   <p className="text-sm text-muted-foreground capitalize">{usr.role}</p>
                 </div>
                 {usr.user_id !== user?.id && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setDeleteDialog({ open: true, userId: usr.id })}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleOpenEditDialog(usr)}
+                    >
+                      <Pencil className="h-4 w-4 text-primary" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setDeleteDialog({ open: true, userId: usr.id })}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
                 )}
               </div>
             ))}
@@ -264,6 +349,66 @@ const RolesUsers = () => {
         title="Delete User?"
         description="This will remove the user and all their permissions. This action cannot be undone."
       />
+
+      <Dialog open={editDialog.open} onOpenChange={(open) => setEditDialog({ open, user: null })}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update the role and entity permissions for {editDialog.user?.email}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select value={editRole} onValueChange={(value: any) => setEditRole(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="editor">Editor</SelectItem>
+                  <SelectItem value="reader">Reader</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Entity Permissions</Label>
+              <div className="border rounded-lg p-4 max-h-48 overflow-y-auto space-y-2">
+                {entities.map((entity) => (
+                  <div key={entity.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`edit-${entity.id}`}
+                      checked={editEntities.includes(entity.id)}
+                      onCheckedChange={() => toggleEditEntitySelection(entity.id)}
+                    />
+                    <label
+                      htmlFor={`edit-${entity.id}`}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      {entity.name}
+                    </label>
+                  </div>
+                ))}
+                {entities.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No entities available</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialog({ open: false, user: null })}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateUser}>
+              Update User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
