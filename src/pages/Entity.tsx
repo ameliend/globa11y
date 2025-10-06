@@ -67,7 +67,7 @@ const Entity = () => {
             .not('score', 'is', null)
             .order('start_date', { ascending: false })
             .limit(1)
-            .single();
+            .maybeSingle();
 
           return {
             ...site,

@@ -258,45 +258,43 @@ const AuditNew = () => {
         return;
       }
 
-      // Get all criteria for this page to find their IDs
+      // Map criteria code to IDs for this page
       const criteriaToUpdate = currentPage.criteria || [];
-      
-      const updates: any[] = [];
+      const getIdByCode = (code: string) => criteriaToUpdate.find((c: any) => c.code === code)?.id;
 
-      // Update non-compliant criteria
-      importResults.nonCompliant.forEach((code) => {
-        const criteria = criteriaToUpdate.find((c: any) => c.code === code);
-        if (criteria) {
-          updates.push({ id: criteria.id, status: 'non-compliant' });
-        }
-      });
+      const nonCompliantIds = importResults.nonCompliant
+        .map(getIdByCode)
+        .filter((id): id is string => Boolean(id));
 
-      // Update compliant criteria
-      importResults.compliant.forEach((code) => {
-        const criteria = criteriaToUpdate.find((c: any) => c.code === code);
-        if (criteria) {
-          updates.push({ id: criteria.id, status: 'compliant' });
-        }
-      });
+      const compliantIds = importResults.compliant
+        .map(getIdByCode)
+        .filter((id): id is string => Boolean(id));
 
-      // Update in batches using ID
-      const updatePromises = updates.map((u) =>
-        supabase
+      // Perform at most two bulk updates to avoid timeouts
+      let errors: any[] = [];
+      if (nonCompliantIds.length) {
+        const { error } = await supabase
           .from('criteria_results')
-          .update({ status: u.status })
-          .eq('id', u.id)
-      );
+          .update({ status: 'non-compliant' })
+          .in('id', nonCompliantIds)
+          .select();
+        if (error) errors.push(error);
+      }
+      if (compliantIds.length) {
+        const { error } = await supabase
+          .from('criteria_results')
+          .update({ status: 'compliant' })
+          .in('id', compliantIds)
+          .select();
+        if (error) errors.push(error);
+      }
 
-      const results = await Promise.all(updatePromises);
-      
-      // Check for errors
-      const errors = results.filter(r => r.error);
       if (errors.length > 0) {
-        console.error('Update errors:', errors);
+        console.error('Bulk update errors:', errors);
         throw new Error('Some updates failed');
       }
 
-      toast.success(`Updated ${updates.length} criteria from JSON import`);
+      toast.success(`Updated ${nonCompliantIds.length + compliantIds.length} criteria from JSON import`);
       setShowImportDialog(false);
       setImportResults({ compliant: [], nonCompliant: [] });
       await fetchReport();
