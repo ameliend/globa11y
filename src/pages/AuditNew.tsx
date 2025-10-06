@@ -258,24 +258,33 @@ const AuditNew = () => {
         return;
       }
 
+      // Get all criteria for this page to find their IDs
+      const criteriaToUpdate = currentPage.criteria || [];
+      
       const updates: any[] = [];
 
       // Update non-compliant criteria
       importResults.nonCompliant.forEach((code) => {
-        updates.push({ code, status: 'non-compliant' });
+        const criteria = criteriaToUpdate.find((c: any) => c.code === code);
+        if (criteria) {
+          updates.push({ id: criteria.id, status: 'non-compliant' });
+        }
       });
 
       // Update compliant criteria
       importResults.compliant.forEach((code) => {
-        updates.push({ code, status: 'compliant' });
+        const criteria = criteriaToUpdate.find((c: any) => c.code === code);
+        if (criteria) {
+          updates.push({ id: criteria.id, status: 'compliant' });
+        }
       });
 
+      // Update in batches using ID
       const updatePromises = updates.map((u) =>
         supabase
           .from('criteria_results')
           .update({ status: u.status })
-          .eq('page_id', currentPage.id)
-          .eq('code', u.code)
+          .eq('id', u.id)
       );
 
       const results = await Promise.all(updatePromises);
