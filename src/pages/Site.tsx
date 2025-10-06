@@ -243,6 +243,7 @@ const Site = () => {
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="hover:bg-transparent"
                     onClick={(e) => {
                       e.stopPropagation();
                       setDeleteDialog({ open: true, reportId: report.id });

@@ -131,17 +131,26 @@ const RolesUsers = () => {
     if (!deleteDialog.userId) return;
 
     try {
-      const { error } = await supabase
+      // Delete user's entity permissions first
+      await supabase
+        .from('user_entity_permissions')
+        .delete()
+        .eq('user_id', deleteDialog.userId);
+
+      // Delete user's role
+      await supabase
         .from('user_roles')
         .delete()
-        .eq('id', deleteDialog.userId);
+        .eq('user_id', deleteDialog.userId);
 
-      if (error) throw error;
+      // Note: We don't delete the profile as it's linked to auth.users
+      // The profile will be automatically deleted when the user is deleted from auth
 
       toast.success('User removed successfully');
       setDeleteDialog({ open: false, userId: null });
       fetchUsers();
     } catch (error: any) {
+      console.error('Delete error:', error);
       toast.error('Failed to remove user');
     }
   };

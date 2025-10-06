@@ -129,6 +129,26 @@ const Entity = () => {
     }
   };
 
+  const handleDeleteSite = async (siteId: string) => {
+    if (!confirm('Are you sure you want to delete this site? This will delete all associated reports.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('sites')
+        .delete()
+        .eq('id', siteId);
+
+      if (error) throw error;
+
+      toast.success('Site deleted successfully');
+      fetchSites();
+    } catch (error: any) {
+      toast.error('Failed to delete site');
+    }
+  };
+
   if (!entity) return null;
 
   return (
@@ -217,15 +237,25 @@ const Entity = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sites.map((site) => (
-            <Card
-              key={site.id}
-              className="cursor-pointer hover:shadow-lg transition-shadow"
-              onClick={() => navigate(`/site/${site.id}`)}
-            >
+            <Card key={site.id} className="hover:shadow-lg transition-shadow">
               <CardHeader>
-                <CardTitle className="text-xl">{site.name}</CardTitle>
+                <div className="flex justify-between items-start">
+                  <CardTitle className="text-xl cursor-pointer" onClick={() => navigate(`/site/${site.id}`)}>
+                    {site.name}
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteSite(site.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="cursor-pointer" onClick={() => navigate(`/site/${site.id}`)}>
                 <p className="text-sm text-muted-foreground mb-2">{site.url}</p>
                 {site.latest_score !== undefined ? (
                   <p className="text-sm font-medium text-foreground">

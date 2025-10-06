@@ -253,6 +253,11 @@ const AuditNew = () => {
   const handleConfirmImport = async () => {
     try {
       const currentPage = pages[currentPageIndex];
+      if (!currentPage) {
+        toast.error('No page selected');
+        return;
+      }
+
       const updates: any[] = [];
 
       // Update non-compliant criteria
@@ -265,21 +270,29 @@ const AuditNew = () => {
         updates.push({ code, status: 'compliant' });
       });
 
-      await Promise.all(
-        updates.map((u) =>
-          supabase
-            .from('criteria_results')
-            .update({ status: u.status })
-            .eq('page_id', currentPage.id)
-            .eq('code', u.code)
-        )
+      const updatePromises = updates.map((u) =>
+        supabase
+          .from('criteria_results')
+          .update({ status: u.status })
+          .eq('page_id', currentPage.id)
+          .eq('code', u.code)
       );
+
+      const results = await Promise.all(updatePromises);
+      
+      // Check for errors
+      const errors = results.filter(r => r.error);
+      if (errors.length > 0) {
+        console.error('Update errors:', errors);
+        throw new Error('Some updates failed');
+      }
 
       toast.success(`Updated ${updates.length} criteria from JSON import`);
       setShowImportDialog(false);
       setImportResults({ compliant: [], nonCompliant: [] });
-      fetchReport();
+      await fetchReport();
     } catch (error: any) {
+      console.error('Import error:', error);
       toast.error('Failed to apply import');
     }
   };
