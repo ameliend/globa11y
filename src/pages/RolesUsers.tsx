@@ -32,6 +32,8 @@ const RolesUsers = () => {
   const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(true);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; userId: string | null }>({
     open: false,
     userId: null,
@@ -44,9 +46,39 @@ const RolesUsers = () => {
   const [editEntities, setEditEntities] = useState<string[]>([]);
 
   useEffect(() => {
-    fetchUsers();
-    fetchEntities();
-  }, []);
+    checkOwnerAccess();
+  }, [user]);
+
+  useEffect(() => {
+    if (isOwner) {
+      fetchUsers();
+      fetchEntities();
+    }
+  }, [isOwner]);
+
+  const checkOwnerAccess = async () => {
+    if (!user) {
+      setCheckingAccess(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'owner')
+        .maybeSingle();
+
+      if (error) throw error;
+      setIsOwner(!!data);
+    } catch (error: any) {
+      console.error('Failed to check owner access:', error);
+      setIsOwner(false);
+    } finally {
+      setCheckingAccess(false);
+    }
+  };
 
   const fetchEntities = async () => {
     try {
@@ -230,6 +262,27 @@ const RolesUsers = () => {
     }
   };
 
+  if (checkingAccess) {
+    return (
+      <div className="container mx-auto py-8 px-4 max-w-4xl">
+        <p className="text-center text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isOwner) {
+    return (
+      <div className="container mx-auto py-8 px-4 max-w-4xl">
+        <Card>
+          <CardContent className="py-12 text-center">
+            <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
+            <p className="text-muted-foreground">Only owners can access this page.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">
       <h1 className="text-3xl font-bold mb-8">Roles & Users</h1>
@@ -323,6 +376,7 @@ const RolesUsers = () => {
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="hover:bg-transparent"
                       onClick={() => setDeleteDialog({ open: true, userId: usr.id })}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
@@ -341,9 +395,9 @@ const RolesUsers = () => {
       <div className="mt-8 p-4 bg-muted rounded-lg">
         <h3 className="font-semibold mb-2">Role Descriptions:</h3>
         <ul className="space-y-2 text-sm">
-          <li><strong>Owner:</strong> Full access - can add/remove users, manage all entities and reports</li>
-          <li><strong>Editor:</strong> Can edit site information and reports, but cannot manage users</li>
-          <li><strong>Reader:</strong> Read-only access to view reports and results</li>
+          <li><strong>Owner:</strong> Full access - can read, create, modify, delete, and access the Roles & Users page to manage users</li>
+          <li><strong>Editor:</strong> Can read, create, modify, and delete entities, sites, and reports</li>
+          <li><strong>Reader:</strong> Read-only access - can only view entities, sites, and reports</li>
         </ul>
         <div className="mt-4 p-3 bg-background border border-border rounded">
           <p className="text-sm font-medium">Password Setup</p>

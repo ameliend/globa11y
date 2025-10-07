@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Plus, ArrowLeft, Trash2, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
 interface Site {
   id: string;
@@ -25,6 +26,11 @@ const Entity = () => {
   const [siteName, setSiteName] = useState('');
   const [siteUrl, setSiteUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [deleteEntityDialog, setDeleteEntityDialog] = useState(false);
+  const [deleteSiteDialog, setDeleteSiteDialog] = useState<{ open: boolean; siteId: string | null }>({
+    open: false,
+    siteId: null,
+  });
 
   useEffect(() => {
     fetchEntity();
@@ -110,10 +116,6 @@ const Entity = () => {
   };
 
   const handleDeleteEntity = async () => {
-    if (!confirm('Are you sure you want to delete this entity? This will delete all associated sites and reports.')) {
-      return;
-    }
-
     try {
       const { error } = await supabase
         .from('entities')
@@ -123,26 +125,26 @@ const Entity = () => {
       if (error) throw error;
 
       toast.success('Entity deleted successfully');
+      setDeleteEntityDialog(false);
       navigate('/');
     } catch (error: any) {
       toast.error('Failed to delete entity');
     }
   };
 
-  const handleDeleteSite = async (siteId: string) => {
-    if (!confirm('Are you sure you want to delete this site? This will delete all associated reports.')) {
-      return;
-    }
+  const handleDeleteSite = async () => {
+    if (!deleteSiteDialog.siteId) return;
 
     try {
       const { error } = await supabase
         .from('sites')
         .delete()
-        .eq('id', siteId);
+        .eq('id', deleteSiteDialog.siteId);
 
       if (error) throw error;
 
       toast.success('Site deleted successfully');
+      setDeleteSiteDialog({ open: false, siteId: null });
       fetchSites();
     } catch (error: any) {
       toast.error('Failed to delete site');
@@ -168,7 +170,7 @@ const Entity = () => {
           <p className="text-muted-foreground">Audited Sites: {sites.length}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleDeleteEntity}>
+          <Button variant="outline" size="sm" onClick={() => setDeleteEntityDialog(true)}>
             <Trash2 className="h-4 w-4" />
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
@@ -246,9 +248,10 @@ const Entity = () => {
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="hover:bg-transparent"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDeleteSite(site.id);
+                      setDeleteSiteDialog({ open: true, siteId: site.id });
                     }}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
@@ -263,7 +266,7 @@ const Entity = () => {
                   </p>
                 ) : (
                   <p className="text-sm font-medium text-muted-foreground">
-                    A auditer
+                    To audit
                   </p>
                 )}
               </CardContent>
@@ -271,6 +274,22 @@ const Entity = () => {
           ))}
         </div>
       )}
+
+      <DeleteConfirmDialog
+        open={deleteEntityDialog}
+        onOpenChange={setDeleteEntityDialog}
+        onConfirm={handleDeleteEntity}
+        title="Delete Entity?"
+        description="This will permanently delete this entity and all associated sites and reports. This action cannot be undone."
+      />
+
+      <DeleteConfirmDialog
+        open={deleteSiteDialog.open}
+        onOpenChange={(open) => setDeleteSiteDialog({ open, siteId: null })}
+        onConfirm={handleDeleteSite}
+        title="Delete Site?"
+        description="This will permanently delete this site and all its reports. This action cannot be undone."
+      />
     </div>
   );
 };
