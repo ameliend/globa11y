@@ -194,9 +194,32 @@ footer{margin-top:18px;font-size:13px;color:#666}
 .muted{color:#777}
 .summary-table { margin-bottom: 2rem;}
 .page-table {margin-top: 0;}
+.download-section{position:fixed;top:20px;right:20px;z-index:1000}
+.download-btn{background:#DC324E;color:#fff;border:none;padding:12px 20px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;margin-left:8px;box-shadow:0 2px 4px rgba(0,0,0,.1);transition:background 0.2s}
+.download-btn:hover{background:#c42943}
 </style>
+<script>
+function downloadHTML() {
+  const content = document.documentElement.outerHTML;
+  const blob = new Blob([content], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'accessibility-statement-' + new Date().toISOString().split('T')[0] + '.html';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadPDF() {
+  window.print();
+}
+</script>
 </head>
 <body>
+<div class="download-section">
+  <button class="download-btn" onclick="downloadHTML()">Download HTML</button>
+  <button class="download-btn" onclick="downloadPDF()">Download PDF</button>
+</div>
 <header>
 <h1>WCAG Accessibility Audit</h1>
 <div class="meta">
@@ -322,7 +345,13 @@ ${nonCompliantList}
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
     
-    toast.success('Accessibility statement generated');
+    // Automatically download the HTML file
+    const downloadLink = document.createElement('a');
+    downloadLink.href = url;
+    downloadLink.download = `accessibility-statement-${entityName.replace(/\s+/g, '-').toLowerCase()}-${today}.html`;
+    downloadLink.click();
+    
+    toast.success('Accessibility statement generated and downloaded');
   };
 
   if (!report) return null;
