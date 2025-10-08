@@ -260,6 +260,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      shares_entity_access: {
+        Args: { _requesting_user_id: string; _target_user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "owner" | "editor" | "reader"
