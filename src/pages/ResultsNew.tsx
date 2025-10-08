@@ -122,18 +122,22 @@ const ResultsNew = () => {
     const notApplicableAA = allCriteria.filter((c: any) => c.status === 'not-applicable' && c.level === 'AA').length;
     const totalNotApplicable = stats.notApplicable;
     
-    const totalCriteria = allCriteria.filter((c: any) => c.status !== 'not-applicable').length;
-    const percentCompliantA = totalCriteria > 0 ? Math.round((compliantA / totalCriteria) * 100) : 0;
-    const percentCompliantAA = totalCriteria > 0 ? Math.round((compliantAA / totalCriteria) * 100) : 0;
+    // Calculate percentages by level (only for applicable criteria)
+    const totalApplicableA = compliantA + nonCompliantA;
+    const totalApplicableAA = compliantAA + nonCompliantAA;
+    const totalApplicable = totalCompliant + totalNonCompliant;
+    
+    const percentCompliantA = totalApplicableA > 0 ? Math.round((compliantA / totalApplicableA) * 100) : 0;
+    const percentCompliantAA = totalApplicableAA > 0 ? Math.round((compliantAA / totalApplicableAA) * 100) : 0;
     const percentCompliant = Math.round(report.score || 0);
     
     // Generate page list
-    const pageList = pages.map(p => `<li>${p.name}</li>`).join('\n      ');
+    const pageList = pages.map(p => `<li>${p.name}</li>`).join('\n');
     
     // Generate non-compliant criteria list
     const nonCompliantList = nonCompliances.map(nc => 
       `<li>${nc.code} ${nc.title}</li>`
-    ).join('\n        ');
+    ).join('\n');
     
     // Generate page statistics table rows
     const pageRows = pages.map(page => {
@@ -161,105 +165,157 @@ const ResultsNew = () => {
     }).join('\n');
     
     const today = new Date().toISOString().split('T')[0];
+    const entityName = report.sites?.entities?.name || 'Audit';
     
-    const htmlContent = `<!DOCTYPE html>
+    const htmlContent = `<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Accessibility Statement - ${report.sites.url}</title>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 1200px; margin: 0 auto; padding: 20px; }
-        h1, h2, h3 { color: #333; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background-color: #f4f4f4; font-weight: bold; }
-        ul { margin: 10px 0; padding-left: 30px; }
-        .score { font-size: 2em; font-weight: bold; color: #2563eb; }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WCAG Accessibility Audit Template</title>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;line-height:1.45;color:#111;padding:24px;background:#f7f7f8}
+header{background:#fff;border-radius:12px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+h1{margin:0 0 6px;font-size:20px}
+.meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+.card{background:#fff;padding:12px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+section{margin-top:16px}
+a {  text-decoration: underline;  color: #DC324E;}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px;border:1px solid #e6e6e9;text-align:left;font-size:14px}
+th{background:#fbfbfc}
+.small{font-size:13px;color:#555}
+.status-conformant{color:green}
+.status-fail{color:#d9534f}
+.status-partial{color:#f0ad4e}
+footer{margin-top:18px;font-size:13px;color:#666}
+.note{background:#fff3cd;border-left:4px solid #ffe08a;padding:10px;border-radius:6px}
+.actions{display:flex;gap:8px;margin-top:12px}
+.muted{color:#777}
+.summary-table { margin-bottom: 2rem;}
+.page-table {margin-top: 0;}
+</style>
 </head>
 <body>
-    <h1>Accessibility Statement</h1>
-    
-    <h2>Scope</h2>
-    <p><strong>Tested URL:</strong> ${report.sites.url}</p>
-    <p><strong>Auditor:</strong> ${data.auditorName}</p>
-    <p><strong>Audit Date:</strong> ${today}</p>
-    
-    <h2>Summary</h2>
-    <p class="score">Score: ${percentCompliant}%</p>
-    
-    <h3>Pages Audited</h3>
-    <ul>
-      ${pageList}
-    </ul>
-    
-    <h3>Testing Environment</h3>
-    <p><strong>Browsers & Devices:</strong> ${data.browsersDevices || 'Not specified'}</p>
-    <p><strong>Technologies/CMS/Libraries:</strong> ${data.technologies || 'Not specified'}</p>
-    <p><strong>Assistive Technologies:</strong> ${data.assistiveTech || 'Not specified'}</p>
-    <p><strong>Automated Tests:</strong> ${data.automatedTests || 'Not specified'}</p>
-    
-    <h2>Non-Compliant Criteria</h2>
-    <ul>
-        ${nonCompliantList}
-    </ul>
-    
-    <h2>Overall Statistics</h2>
-    <table>
-      <thead>
-        <tr>
-          <th scope="col">Status</th>
-          <th scope="col">Level A</th>
-          <th scope="col">Level AA</th>
-          <th scope="col">Total</th>
-          <th scope="col">Percentage</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <th scope="row">Compliant</th>
-          <td>${compliantA}</td>
-          <td>${compliantAA}</td>
-          <td>${totalCompliant}</td>
-          <td>${percentCompliant}%</td>
-        </tr>
-        <tr>
-          <th scope="row">Non-Compliant</th>
-          <td>${nonCompliantA}</td>
-          <td>${nonCompliantAA}</td>
-          <td>${totalNonCompliant}</td>
-          <td>-</td>
-        </tr>
-        <tr>
-          <th scope="row">Not Applicable</th>
-          <td>${notApplicableA}</td>
-          <td>${notApplicableAA}</td>
-          <td>${totalNotApplicable}</td>
-          <td>-</td>
-        </tr>
-      </tbody>
-    </table>
-    
-    <h2>Statistics by Page</h2>
-    <table>
-      <thead>
-        <tr>
-          <th scope="col">Page</th>
-          <th scope="col">Compliant A</th>
-          <th scope="col">Compliant AA</th>
-          <th scope="col">Non-Compliant A</th>
-          <th scope="col">Non-Compliant AA</th>
-          <th scope="col">Not Applicable A</th>
-          <th scope="col">Not Applicable AA</th>
-          <th scope="col">Score</th>
-        </tr>
-      </thead>
-      <tbody>
+<header>
+<h1>WCAG Accessibility Audit</h1>
+<div class="meta">
+<div class="card"><strong>Service :</strong> <span id="project-name">${entityName}</span></div>
+<div class="card"><strong>Page / URL:</strong> <span id="page-url">${report.sites.url}</span></div>
+<div class="card"><strong>Auditor:</strong> <span id="tester">${data.auditorName}</span></div>
+<div class="card"><strong>Date:</strong> <span id="date">${today}</span></div>
+<div class="card"><strong>Target WCAG Level:</strong> <span id="level">A / AA </span></div>
+</div>
+</header>
+
+
+<section class="card" aria-labelledby="scope-heading">
+<h2 id="scope-heading">1. Scope and Context</h2>
+<p class="small">Define the technical and functional scope of the tests.</p>
+<ul>
+<li><strong>Target pages and user flows:</strong> <ul>${pageList}</ul></li>
+<li><strong>Browsers & devices tested:</strong> ${data.browsersDevices || 'Not specified'}</li>
+<li><strong>Technologies / CMS / libraries:</strong> ${data.technologies || 'Not specified'}</li>
+<li><strong>Assistive tech used:</strong> ${data.assistiveTech || 'Not specified'}</li>
+<li><strong>Automated tests:</strong> ${data.automatedTests || 'Not specified'}</li>
+</ul>
+</section>
+
+
+
+<section class="card" aria-labelledby="summary-heading">
+<h2 id="summary-heading">2. Executive Summary</h2>
+<p class="small">Brief overview of the results, overall compliance level, and critical issues.</p>
+<p><strong>Estimated compliance level:</strong> ${percentCompliant}% level A-AA</p>
+<table class="summary-table">
+    <caption>Synthesis by WCAG conformance levels</caption>
+    <thead>
+      <tr>
+        <th scope="col">Level</th>
+        <th scope="col">A</th>
+        <th scope="col">AA</th>
+        <th scope="col">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">Number of criteria</th>
+        <td>32</td>
+        <td>24</td>
+        <td>56</td>
+      </tr>
+      <tr>
+        <th scope="row">Compliant</th>
+        <td>${compliantA}</td>
+        <td>${compliantAA}</td>
+        <td>${totalCompliant}</td>
+      </tr>
+      <tr>
+        <th scope="row">Non-compliant</th>
+        <td>${nonCompliantA}</td>
+        <td>${nonCompliantAA}</td>
+        <td>${totalNonCompliant}</td>
+      </tr>
+      <tr>
+        <th scope="row">Not applicable</th>
+        <td>${notApplicableA}</td>
+        <td>${notApplicableAA}</td>
+        <td>${totalNotApplicable}</td>
+      </tr>
+      <tr>
+        <th scope="row">Compliance rate</th>
+        <td>${percentCompliantA}%</td>
+        <td>${percentCompliantAA}%</td>
+        <td>${percentCompliant}%</td>
+      </tr>
+    </tbody>
+  </table>
+
+   <table class="page-table">
+    <caption>Criteria results by page and WCAG level</caption>
+    <thead>
+      <tr>
+        <th scope="col">Page</th>
+        <th scope="col">Compliant / A</th>
+        <th scope="col">Compliant / AA</th>
+        <th scope="col">Non-compliant / A</th>
+        <th scope="col">Non-compliant / AA</th>
+        <th scope="col">Not applicable / A</th>
+        <th scope="col">Not applicable / AA</th>
+        <th scope="col">Compliance rate</th>
+      </tr>
+    </thead>
+    <tbody>
 ${pageRows}
-      </tbody>
-    </table>
+    </tbody>
+  </table>
+</section>
+
+
+
+<section class="card" aria-labelledby="ux-heading">
+<h2 id="ux-heading">3. Inaccessible content</h2>
+<p>All non-conformities are identified and taken into account by the teams concerned. Here is the list of non-compliant WCAG criteria:</p>
+<ul>
+${nonCompliantList}
+</ul>
+</section>
+
+
+<section class="card" aria-labelledby="recommendations-heading">
+<h2 id="recommendations-heading">4. Annual action plan</h2>
+<p> For a long-term perspective and strategic roadmap, please refer to the <a href="https://bran-media.canalplus.pro/file/68e61b5c64e83/uploads/media/Multi_Year_Accessibility_.pdf">Multi-year Action Plan </a></p>
+</section>
+
+
+<section class="card" aria-labelledby="tracking-heading">
+<h2 id="tracking-heading">5. Contact us for help with accessibility features</h2>
+<p> To request an accessibility improvement, share your experience using Apple product accessibility features, or provide other accessibility feedback, please email the Accessibility Feedback team (accessibility@canal-plus.com).</p>
+</section>
+
+
 </body>
+
 </html>`;
     
     const blob = new Blob([htmlContent], { type: 'text/html' });
