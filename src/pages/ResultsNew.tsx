@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { AccessibilityStatementModal, AccessibilityStatementData } from '@/components/AccessibilityStatementModal';
 
 interface NonCompliance {
   code: string;
@@ -21,6 +22,7 @@ const ResultsNew = () => {
   const [pages, setPages] = useState<any[]>([]);
   const [nonCompliances, setNonCompliances] = useState<NonCompliance[]>([]);
   const [stats, setStats] = useState({ compliant: 0, nonCompliant: 0, notApplicable: 0 });
+  const [showStatementModal, setShowStatementModal] = useState(false);
 
   useEffect(() => {
     fetchResults();
@@ -104,6 +106,169 @@ const ResultsNew = () => {
     }
   };
 
+  const generateAccessibilityStatement = (data: AccessibilityStatementData) => {
+    // Calculate detailed statistics by level
+    const allCriteria = pages.flatMap(p => p.criteria_results);
+    
+    const compliantA = allCriteria.filter((c: any) => c.status === 'compliant' && c.level === 'A').length;
+    const compliantAA = allCriteria.filter((c: any) => c.status === 'compliant' && c.level === 'AA').length;
+    const totalCompliant = stats.compliant;
+    
+    const nonCompliantA = allCriteria.filter((c: any) => c.status === 'non-compliant' && c.level === 'A').length;
+    const nonCompliantAA = allCriteria.filter((c: any) => c.status === 'non-compliant' && c.level === 'AA').length;
+    const totalNonCompliant = stats.nonCompliant;
+    
+    const notApplicableA = allCriteria.filter((c: any) => c.status === 'not-applicable' && c.level === 'A').length;
+    const notApplicableAA = allCriteria.filter((c: any) => c.status === 'not-applicable' && c.level === 'AA').length;
+    const totalNotApplicable = stats.notApplicable;
+    
+    const totalCriteria = allCriteria.filter((c: any) => c.status !== 'not-applicable').length;
+    const percentCompliantA = totalCriteria > 0 ? Math.round((compliantA / totalCriteria) * 100) : 0;
+    const percentCompliantAA = totalCriteria > 0 ? Math.round((compliantAA / totalCriteria) * 100) : 0;
+    const percentCompliant = Math.round(report.score || 0);
+    
+    // Generate page list
+    const pageList = pages.map(p => `<li>${p.name}</li>`).join('\n      ');
+    
+    // Generate non-compliant criteria list
+    const nonCompliantList = nonCompliances.map(nc => 
+      `<li>${nc.code} ${nc.title}</li>`
+    ).join('\n        ');
+    
+    // Generate page statistics table rows
+    const pageRows = pages.map(page => {
+      const pageCriteria = page.criteria_results;
+      const pageCompliantA = pageCriteria.filter((c: any) => c.status === 'compliant' && c.level === 'A').length;
+      const pageCompliantAA = pageCriteria.filter((c: any) => c.status === 'compliant' && c.level === 'AA').length;
+      const pageNonCompliantA = pageCriteria.filter((c: any) => c.status === 'non-compliant' && c.level === 'A').length;
+      const pageNonCompliantAA = pageCriteria.filter((c: any) => c.status === 'non-compliant' && c.level === 'AA').length;
+      const pageNotApplicableA = pageCriteria.filter((c: any) => c.status === 'not-applicable' && c.level === 'A').length;
+      const pageNotApplicableAA = pageCriteria.filter((c: any) => c.status === 'not-applicable' && c.level === 'AA').length;
+      const pageTotal = pageCriteria.filter((c: any) => c.status !== 'not-applicable').length;
+      const pageCompliantCount = pageCriteria.filter((c: any) => c.status === 'compliant').length;
+      const pagePercent = pageTotal > 0 ? Math.round((pageCompliantCount / pageTotal) * 100) : 0;
+      
+      return `      <tr>
+        <th scope="row">${page.name}</th>
+        <td>${pageCompliantA}</td>
+        <td>${pageCompliantAA}</td>
+        <td>${pageNonCompliantA}</td>
+        <td>${pageNonCompliantAA}</td>
+        <td>${pageNotApplicableA}</td>
+        <td>${pageNotApplicableAA}</td>
+        <td>${pagePercent}%</td>
+      </tr>`;
+    }).join('\n');
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accessibility Statement - ${report.sites.url}</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        h1, h2, h3 { color: #333; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f4f4f4; font-weight: bold; }
+        ul { margin: 10px 0; padding-left: 30px; }
+        .score { font-size: 2em; font-weight: bold; color: #2563eb; }
+    </style>
+</head>
+<body>
+    <h1>Accessibility Statement</h1>
+    
+    <h2>Scope</h2>
+    <p><strong>Tested URL:</strong> ${report.sites.url}</p>
+    <p><strong>Auditor:</strong> ${data.auditorName}</p>
+    <p><strong>Audit Date:</strong> ${today}</p>
+    
+    <h2>Summary</h2>
+    <p class="score">Score: ${percentCompliant}%</p>
+    
+    <h3>Pages Audited</h3>
+    <ul>
+      ${pageList}
+    </ul>
+    
+    <h3>Testing Environment</h3>
+    <p><strong>Browsers & Devices:</strong> ${data.browsersDevices || 'Not specified'}</p>
+    <p><strong>Technologies/CMS/Libraries:</strong> ${data.technologies || 'Not specified'}</p>
+    <p><strong>Assistive Technologies:</strong> ${data.assistiveTech || 'Not specified'}</p>
+    <p><strong>Automated Tests:</strong> ${data.automatedTests || 'Not specified'}</p>
+    
+    <h2>Non-Compliant Criteria</h2>
+    <ul>
+        ${nonCompliantList}
+    </ul>
+    
+    <h2>Overall Statistics</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Status</th>
+          <th scope="col">Level A</th>
+          <th scope="col">Level AA</th>
+          <th scope="col">Total</th>
+          <th scope="col">Percentage</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">Compliant</th>
+          <td>${compliantA}</td>
+          <td>${compliantAA}</td>
+          <td>${totalCompliant}</td>
+          <td>${percentCompliant}%</td>
+        </tr>
+        <tr>
+          <th scope="row">Non-Compliant</th>
+          <td>${nonCompliantA}</td>
+          <td>${nonCompliantAA}</td>
+          <td>${totalNonCompliant}</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <th scope="row">Not Applicable</th>
+          <td>${notApplicableA}</td>
+          <td>${notApplicableAA}</td>
+          <td>${totalNotApplicable}</td>
+          <td>-</td>
+        </tr>
+      </tbody>
+    </table>
+    
+    <h2>Statistics by Page</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Page</th>
+          <th scope="col">Compliant A</th>
+          <th scope="col">Compliant AA</th>
+          <th scope="col">Non-Compliant A</th>
+          <th scope="col">Non-Compliant AA</th>
+          <th scope="col">Not Applicable A</th>
+          <th scope="col">Not Applicable AA</th>
+          <th scope="col">Score</th>
+        </tr>
+      </thead>
+      <tbody>
+${pageRows}
+      </tbody>
+    </table>
+</body>
+</html>`;
+    
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    
+    toast.success('Accessibility statement generated');
+  };
+
   if (!report) return null;
 
   return (
@@ -123,6 +288,10 @@ const ResultsNew = () => {
           <p className="text-muted-foreground">{report.sites.url}</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowStatementModal(true)}>
+            <FileText className="mr-2 h-4 w-4" />
+            Generate Accessibility Statement
+          </Button>
           <Button variant="outline" onClick={handleEdit}>
             <Edit className="mr-2 h-4 w-4" />
             Edit
@@ -246,6 +415,12 @@ const ResultsNew = () => {
           )}
         </CardContent>
       </Card>
+
+      <AccessibilityStatementModal
+        open={showStatementModal}
+        onOpenChange={setShowStatementModal}
+        onGenerate={generateAccessibilityStatement}
+      />
     </div>
   );
 };
