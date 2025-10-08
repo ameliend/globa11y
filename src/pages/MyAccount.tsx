@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocation } from 'react-router-dom';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,8 +21,18 @@ const passwordSchema = z
 
 const MyAccount = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPasswordResetMessage, setShowPasswordResetMessage] = useState(false);
+
+  useEffect(() => {
+    // Check if coming from password reset link
+    const params = new URLSearchParams(location.search);
+    if (params.get('type') === 'recovery') {
+      setShowPasswordResetMessage(true);
+    }
+  }, [location]);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +64,15 @@ const MyAccount = () => {
   return (
     <div className="container mx-auto py-8 px-4 max-w-2xl">
       <h1 className="text-3xl font-bold mb-8">My Account</h1>
+      
+      {showPasswordResetMessage && (
+        <Alert className="mb-6">
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Update your password
+          </AlertDescription>
+        </Alert>
+      )}
       
       <Card>
         <CardHeader>
