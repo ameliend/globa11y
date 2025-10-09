@@ -128,6 +128,10 @@ export type Database = {
       }
       reports: {
         Row: {
+          assistive_tech: string | null
+          auditor_name: string | null
+          automated_tests: string | null
+          browsers_devices: string | null
           created_at: string | null
           id: string
           name: string
@@ -135,8 +139,13 @@ export type Database = {
           site_id: string
           start_date: string
           status: string | null
+          technologies: string | null
         }
         Insert: {
+          assistive_tech?: string | null
+          auditor_name?: string | null
+          automated_tests?: string | null
+          browsers_devices?: string | null
           created_at?: string | null
           id?: string
           name: string
@@ -144,8 +153,13 @@ export type Database = {
           site_id: string
           start_date: string
           status?: string | null
+          technologies?: string | null
         }
         Update: {
+          assistive_tech?: string | null
+          auditor_name?: string | null
+          automated_tests?: string | null
+          browsers_devices?: string | null
           created_at?: string | null
           id?: string
           name?: string
@@ -153,6 +167,7 @@ export type Database = {
           site_id?: string
           start_date?: string
           status?: string | null
+          technologies?: string | null
         }
         Relationships: [
           {

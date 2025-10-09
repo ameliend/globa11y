@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Edit, Trash2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { AccessibilityStatementModal, AccessibilityStatementData } from '@/components/AccessibilityStatementModal';
+import { AccessibilityStatementData } from '@/components/AccessibilityStatementModal';
 
 interface NonCompliance {
   code: string;
@@ -22,7 +22,6 @@ const ResultsNew = () => {
   const [pages, setPages] = useState<any[]>([]);
   const [nonCompliances, setNonCompliances] = useState<NonCompliance[]>([]);
   const [stats, setStats] = useState({ compliant: 0, nonCompliant: 0, notApplicable: 0 });
-  const [showStatementModal, setShowStatementModal] = useState(false);
 
   useEffect(() => {
     fetchResults();
@@ -165,7 +164,6 @@ const ResultsNew = () => {
     }).join('\n');
     
     const today = new Date().toISOString().split('T')[0];
-    const entityName = report.sites?.entities?.name || 'Audit';
     
     const htmlContent = `<!doctype html>
 <html lang="en">
@@ -223,7 +221,7 @@ function downloadPDF() {
 <header>
 <h1>WCAG Accessibility Audit</h1>
 <div class="meta">
-<div class="card"><strong>Service :</strong> <span id="project-name">${entityName}</span></div>
+<div class="card"><strong>Service :</strong> <span id="project-name">CANAL+</span></div>
 <div class="card"><strong>Page / URL:</strong> <span id="page-url">${report.sites.url}</span></div>
 <div class="card"><strong>Auditor:</strong> <span id="tester">${data.auditorName}</span></div>
 <div class="card"><strong>Date:</strong> <span id="date">${today}</span></div>
@@ -348,7 +346,7 @@ ${nonCompliantList}
     // Automatically download the HTML file
     const downloadLink = document.createElement('a');
     downloadLink.href = url;
-    downloadLink.download = `accessibility-statement-${entityName.replace(/\s+/g, '-').toLowerCase()}-${today}.html`;
+    downloadLink.download = `accessibility-statement-CANAL+-${today}.html`;
     downloadLink.click();
     
     toast.success('Accessibility statement generated and downloaded');
@@ -373,7 +371,20 @@ ${nonCompliantList}
           <p className="text-muted-foreground">{report.sites.url}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowStatementModal(true)}>
+          <Button variant="outline" onClick={() => {
+            if (report.auditor_name) {
+              // If audit info exists, directly generate statement
+              generateAccessibilityStatement({
+                auditorName: report.auditor_name || '',
+                browsersDevices: report.browsers_devices || '',
+                technologies: report.technologies || '',
+                assistiveTech: report.assistive_tech || '',
+                automatedTests: report.automated_tests || 'Evinced',
+              });
+            } else {
+              toast.error('No audit information found. Please validate the audit first.');
+            }
+          }}>
             <FileText className="mr-2 h-4 w-4" />
             Generate Accessibility Statement
           </Button>
@@ -500,12 +511,6 @@ ${nonCompliantList}
           )}
         </CardContent>
       </Card>
-
-      <AccessibilityStatementModal
-        open={showStatementModal}
-        onOpenChange={setShowStatementModal}
-        onGenerate={generateAccessibilityStatement}
-      />
     </div>
   );
 };

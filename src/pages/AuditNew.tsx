@@ -16,6 +16,7 @@ import { wcagCriteria } from '@/data/wcagCriteria';
 import wcagFullData from '@/data/wcag-full.json';
 import { howToTest } from '@/data/howToTest';
 import { Collapsible as CollapsiblePrimitive, CollapsibleContent as CollapsibleContentPrimitive, CollapsibleTrigger as CollapsibleTriggerPrimitive } from '@/components/ui/collapsible';
+import { AccessibilityStatementModal, AccessibilityStatementData } from '@/components/AccessibilityStatementModal';
 
 interface CriteriaStatus {
   id: string;
@@ -46,6 +47,7 @@ const AuditNew = () => {
   const [showDuplicateOption, setShowDuplicateOption] = useState(false);
   const [selectedPageToDuplicate, setSelectedPageToDuplicate] = useState<string>('');
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showAuditInfoModal, setShowAuditInfoModal] = useState(false);
   const [importResults, setImportResults] = useState<{
     compliant: string[];
     nonCompliant: string[];
@@ -344,12 +346,15 @@ const AuditNew = () => {
     }
   };
 
-  const handleValidateAudit = async () => {
+  const handleValidateAudit = () => {
     if (pages.length === 0) {
       toast.error('Please add at least one page');
       return;
     }
+    setShowAuditInfoModal(true);
+  };
 
+  const handleSaveAuditInfo = async (data: AccessibilityStatementData) => {
     try {
       const allCriteria = pages.flatMap((p) => p.criteria);
       const compliant = allCriteria.filter((c) => c.status === 'compliant').length;
@@ -358,7 +363,15 @@ const AuditNew = () => {
 
       const { error } = await supabase
         .from('reports')
-        .update({ status: 'completed', score })
+        .update({ 
+          status: 'completed', 
+          score,
+          auditor_name: data.auditorName,
+          browsers_devices: data.browsersDevices,
+          technologies: data.technologies,
+          assistive_tech: data.assistiveTech,
+          automated_tests: data.automatedTests
+        })
         .eq('id', reportId);
 
       if (error) throw error;
@@ -670,6 +683,12 @@ const AuditNew = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AccessibilityStatementModal
+        open={showAuditInfoModal}
+        onOpenChange={setShowAuditInfoModal}
+        onGenerate={handleSaveAuditInfo}
+      />
     </div>
   );
 };

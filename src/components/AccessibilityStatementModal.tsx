@@ -58,7 +58,7 @@ export const AccessibilityStatementModal = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Generate Accessibility Statement</DialogTitle>
+          <DialogTitle>Audit informations</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
