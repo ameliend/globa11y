@@ -46,11 +46,24 @@ const ResultsNew = () => {
       if (pagesError) throw pagesError;
       setPages(pagesData || []);
 
-      // Calculate stats
-      const allCriteria = pagesData?.flatMap((p: any) => p.criteria_results) || [];
-      const compliant = allCriteria.filter((c: any) => c.status === 'compliant').length;
-      const nonCompliant = allCriteria.filter((c: any) => c.status === 'non-compliant').length;
-      const notApplicable = allCriteria.filter((c: any) => c.status === 'not-applicable').length;
+      // Calculate stats - count unique criteria codes across all pages
+      const uniqueCriteriaCodes = new Set<string>();
+      const compliantCodes = new Set<string>();
+      const nonCompliantCodes = new Set<string>();
+      const notApplicableCodes = new Set<string>();
+      
+      pagesData?.forEach((page: any) => {
+        page.criteria_results.forEach((c: any) => {
+          uniqueCriteriaCodes.add(c.code);
+          if (c.status === 'compliant') compliantCodes.add(c.code);
+          if (c.status === 'non-compliant') nonCompliantCodes.add(c.code);
+          if (c.status === 'not-applicable') notApplicableCodes.add(c.code);
+        });
+      });
+      
+      const compliant = compliantCodes.size;
+      const nonCompliant = nonCompliantCodes.size;
+      const notApplicable = notApplicableCodes.size;
       setStats({ compliant, nonCompliant, notApplicable });
 
       // Group non-compliances by criteria (count same criterion on multiple pages as one)
@@ -128,7 +141,7 @@ const ResultsNew = () => {
     
     const percentCompliantA = totalApplicableA > 0 ? Math.round((compliantA / totalApplicableA) * 100) : 0;
     const percentCompliantAA = totalApplicableAA > 0 ? Math.round((compliantAA / totalApplicableAA) * 100) : 0;
-    const percentCompliant = Math.round(report.score || 0);
+    const percentCompliant = Math.round(((stats.compliant + stats.notApplicable) / 55) * 100);
     
     // Generate page list
     const pageList = pages.map(p => `<li>${p.name}</li>`).join('\n');
@@ -262,8 +275,8 @@ function downloadPDF() {
       <tr>
         <th scope="row">Number of criteria</th>
         <td>32</td>
-        <td>24</td>
-        <td>56</td>
+        <td>23</td>
+        <td>55</td>
       </tr>
       <tr>
         <th scope="row">Compliant</th>
@@ -406,7 +419,7 @@ ${nonCompliantList}
           </CardHeader>
           <CardContent>
             <p className="text-5xl font-bold text-foreground">
-              {Math.round(report.score || 0)}%
+              {Math.round(((stats.compliant + stats.notApplicable) / 55) * 100)}%
             </p>
           </CardContent>
         </Card>

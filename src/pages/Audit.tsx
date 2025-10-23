@@ -99,13 +99,18 @@ const Audit = () => {
   };
 
   const validateAudit = () => {
-    const totalCriteria = currentPages.reduce((sum, page) => 
-      sum + page.criteria.filter(c => c.status !== 'not-applicable').length, 0);
+    // Count unique criteria codes across all pages
+    const compliantCodes = new Set<string>();
+    const notApplicableCodes = new Set<string>();
     
-    const compliantCriteria = currentPages.reduce((sum, page) => 
-      sum + page.criteria.filter(c => c.status === 'compliant').length, 0);
+    currentPages.forEach(page => {
+      page.criteria.forEach(c => {
+        if (c.status === 'compliant') compliantCodes.add(c.code);
+        if (c.status === 'not-applicable') notApplicableCodes.add(c.code);
+      });
+    });
     
-    const score = totalCriteria > 0 ? Math.round((compliantCriteria / totalCriteria) * 100) : 0;
+    const score = Math.round(((compliantCodes.size + notApplicableCodes.size) / 55) * 100);
 
     updateReport(reportId!, { 
       pages: currentPages, 
@@ -170,25 +175,42 @@ const Audit = () => {
           </Card>
         ) : (
           <>
-            <div className="flex items-center gap-4 mb-6">
-              <h2 className="text-xl font-semibold">Page : {currentPage.name}</h2>
-              {currentPages.length > 1 && (
-                <Select
-                  value={currentPageIndex.toString()}
-                  onValueChange={(value) => setCurrentPageIndex(parseInt(value))}
-                >
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {currentPages.map((page, index) => (
-                      <SelectItem key={page.id} value={index.toString()}>
-                        {page.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+            <div className="flex flex-col gap-4 mb-6">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <Label htmlFor="current-page-name" className="text-sm mb-2">Nom de la page</Label>
+                  <Input
+                    id="current-page-name"
+                    value={currentPage.name}
+                    onChange={(e) => {
+                      const updatedPages = [...currentPages];
+                      updatedPages[currentPageIndex].name = e.target.value;
+                      setCurrentPages(updatedPages);
+                    }}
+                    className="text-lg font-semibold"
+                  />
+                </div>
+                {currentPages.length > 1 && (
+                  <div>
+                    <Label htmlFor="page-selector" className="text-sm mb-2">Changer de page</Label>
+                    <Select
+                      value={currentPageIndex.toString()}
+                      onValueChange={(value) => setCurrentPageIndex(parseInt(value))}
+                    >
+                      <SelectTrigger id="page-selector" className="w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currentPages.map((page, index) => (
+                          <SelectItem key={page.id} value={index.toString()}>
+                            {page.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-4 mb-6">
