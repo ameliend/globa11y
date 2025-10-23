@@ -122,11 +122,11 @@ const AuditNew = () => {
 
   const initializePage = (duplicateFromPage?: AuditPage) => {
     const baseCriteria = wcagCriteria.map((c) => {
-      const principle = getPrincipleForCriteria(c.code);
-      const description = getDescriptionForCriteria(c.code);
+      const principle = getPrincipleForCriteria(c.ref_id);
+      const description = getDescriptionForCriteria(c.ref_id);
       return {
         id: Math.random().toString(36).substr(2, 9),
-        code: c.code,
+        code: c.ref_id,
         title: c.title,
         description,
         level: c.level,

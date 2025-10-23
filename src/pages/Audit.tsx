@@ -58,8 +58,8 @@ const Audit = () => {
       id: Math.random().toString(36).substr(2, 9),
       name: pageName,
       criteria: wcagCriteria.map(criterion => ({
-        id: criterion.code,
-        code: criterion.code,
+        id: criterion.ref_id,
+        code: criterion.ref_id,
         title: criterion.title,
         level: criterion.level,
         status: 'not-applicable' as const,
@@ -193,7 +193,7 @@ const Audit = () => {
 
             <div className="space-y-4 mb-6">
               {currentPage.criteria.map((criterion) => {
-                const wcagInfo = wcagCriteria.find(w => w.code === criterion.code);
+                const wcagInfo = wcagCriteria.find(w => w.ref_id === criterion.code);
                 return (
                   <Card key={criterion.id}>
                     <CardContent className="p-6">
@@ -243,14 +243,21 @@ const Audit = () => {
                             />
                           </div>
 
-                          {wcagInfo && (
+                          {wcagInfo && wcagInfo.special_cases && wcagInfo.special_cases.length > 0 && (
                             <Collapsible>
                               <CollapsibleTrigger className="flex items-center gap-2 text-sm text-primary hover:underline">
                                 <Info className="h-4 w-4" />
-                                Comment tester ce critère ?
+                                Cas spéciaux
                               </CollapsibleTrigger>
                               <CollapsibleContent className="mt-2 p-4 bg-muted rounded-lg">
-                                <p className="text-sm">{wcagInfo.howToTest}</p>
+                                <div className="space-y-3">
+                                  {wcagInfo.special_cases.map((specialCase, idx) => (
+                                    <div key={idx}>
+                                      <p className="text-sm font-semibold">{specialCase.title}</p>
+                                      <p className="text-sm mt-1">{specialCase.description}</p>
+                                    </div>
+                                  ))}
+                                </div>
                               </CollapsibleContent>
                             </Collapsible>
                           )}
