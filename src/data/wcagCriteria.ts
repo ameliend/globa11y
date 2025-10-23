@@ -1,7 +1,7 @@
 export interface SpecialCase {
   type: string;
   title: string;
-  description: string;
+  description?: string;
 }
 
 export interface WCAGCriterion {
@@ -20,7 +20,10 @@ export const wcagCriteria: WCAGCriterion[] = wcagFullData
   .flatMap((principle: any) => 
     principle.guidelines.flatMap((guideline: any) => 
       guideline.success_criteria
-        .filter((criterion: any) => criterion.level !== 'AAA')
+        .filter((criterion: any) => 
+          criterion.level !== 'AAA' && 
+          criterion.ref_id !== '4.1.1' // Remove obsolete criterion
+        )
         .map((criterion: any) => ({
           ref_id: criterion.ref_id,
           title: criterion.title,

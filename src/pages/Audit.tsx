@@ -254,7 +254,9 @@ const Audit = () => {
                                   {wcagInfo.special_cases.map((specialCase, idx) => (
                                     <div key={idx}>
                                       <p className="text-sm font-semibold">{specialCase.title}</p>
-                                      <p className="text-sm mt-1">{specialCase.description}</p>
+                                      {specialCase.description && (
+                                        <p className="text-sm mt-1">{specialCase.description}</p>
+                                      )}
                                     </div>
                                   ))}
                                 </div>

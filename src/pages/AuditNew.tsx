@@ -507,7 +507,7 @@ const AuditNew = () => {
                               <div className="flex items-start gap-4">
                                 {getStatusIcon(criterion.status)}
                                 <div className="flex-1 space-y-3">
-                                  <div>
+                                   <div>
                                     <h4 className="font-semibold">
                                       {criterion.code} - {criterion.title}
                                       <span className="ml-2 text-sm text-muted-foreground">
@@ -519,6 +519,23 @@ const AuditNew = () => {
                                          {criterion.description}
                                        </p>
                                      )}
+                                     {(() => {
+                                       const wcagCriterion = wcagCriteria.find(c => c.ref_id === criterion.code);
+                                       return wcagCriterion?.special_cases && wcagCriterion.special_cases.length > 0 && (
+                                         <div className="mt-3 text-sm">
+                                           <div className="space-y-2">
+                                             {wcagCriterion.special_cases.map((specialCase, index) => (
+                                               <div key={index} className="bg-muted/30 p-3 rounded border border-border/50">
+                                                 <p className="font-medium text-foreground">{specialCase.title}</p>
+                                                 {specialCase.description && (
+                                                   <p className="text-muted-foreground mt-1">{specialCase.description}</p>
+                                                 )}
+                                               </div>
+                                             ))}
+                                           </div>
+                                         </div>
+                                       );
+                                     })()}
                                      {howToTest[criterion.code] && (
                                        <CollapsiblePrimitive className="mt-2">
                                          <CollapsibleTriggerPrimitive className="flex items-center gap-2 text-sm font-medium text-primary underline">
