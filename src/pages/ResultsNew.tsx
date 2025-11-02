@@ -479,8 +479,8 @@ ${nonCompliantList}
             {pages.map((page) => {
               const pageCompliant = page.criteria_results.filter((c: any) => c.status === 'compliant').length;
               const pageNonCompliant = page.criteria_results.filter((c: any) => c.status === 'non-compliant').length;
-              const pageTotal = page.criteria_results.filter((c: any) => c.status !== 'not-applicable').length;
-              const pageScore = pageTotal > 0 ? (pageCompliant / pageTotal) * 100 : 0;
+              const pageNotApplicable = page.criteria_results.filter((c: any) => c.status === 'not-applicable').length;
+              const pageScore = Math.round(((pageCompliant + pageNotApplicable) / 55) * 100);
 
               return (
                 <div key={page.id} className="flex justify-between items-center p-4 border rounded-lg">
