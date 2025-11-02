@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, CheckCircle2, XCircle, MinusCircle, Info } from 'lucide-react';
+import { ArrowLeft, Plus, CheckCircle2, XCircle, MinusCircle, Info, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -98,6 +98,48 @@ const Audit = () => {
     setCurrentPageIndex(currentPages.length);
   };
 
+  const deletePage = (pageIndex: number) => {
+    if (currentPages.length === 1) {
+      toast.error('Impossible de supprimer la dernière page');
+      return;
+    }
+    
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette page ?')) {
+      return;
+    }
+
+    const updatedPages = currentPages.filter((_, index) => index !== pageIndex);
+    setCurrentPages(updatedPages);
+    updateReport(reportId!, { pages: updatedPages });
+    
+    // Adjust current page index if needed
+    if (currentPageIndex >= updatedPages.length) {
+      setCurrentPageIndex(Math.max(0, updatedPages.length - 1));
+    }
+    
+    toast.success('Page supprimée');
+  };
+
+  const calculatePageScore = (page: AuditPage) => {
+    const compliantCount = page.criteria.filter(c => c.status === 'compliant').length;
+    const notApplicableCount = page.criteria.filter(c => c.status === 'not-applicable').length;
+    return Math.round(((compliantCount + notApplicableCount) / 55) * 100);
+  };
+
+  const calculateOverallScore = () => {
+    const compliantCodes = new Set<string>();
+    const notApplicableCodes = new Set<string>();
+    
+    currentPages.forEach(page => {
+      page.criteria.forEach(c => {
+        if (c.status === 'compliant') compliantCodes.add(c.code);
+        if (c.status === 'not-applicable') notApplicableCodes.add(c.code);
+      });
+    });
+    
+    return Math.round(((compliantCodes.size + notApplicableCodes.size) / 55) * 100);
+  };
+
   const validateAudit = () => {
     // Count unique criteria codes across all pages
     const compliantCodes = new Set<string>();
@@ -175,7 +217,26 @@ const Audit = () => {
           </Card>
         ) : (
           <>
-            <div className="flex flex-col gap-4 mb-6">
+            <div className="mb-6">
+              <Card className="mb-4">
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Score de la page</p>
+                      <p className="text-3xl font-bold">{calculatePageScore(currentPage)}%</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Overall Score</p>
+                      <p className="text-3xl font-bold">{calculateOverallScore()}%</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Pages auditées</p>
+                      <p className="text-3xl font-bold">{currentPages.length}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <div className="flex items-center gap-4">
                 <div className="flex-1">
                   <Label htmlFor="current-page-name" className="text-sm mb-2">Nom de la page</Label>
@@ -210,6 +271,18 @@ const Audit = () => {
                     </Select>
                   </div>
                 )}
+                <div>
+                  <Label className="text-sm mb-2 opacity-0">Actions</Label>
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    onClick={() => deletePage(currentPageIndex)}
+                    disabled={currentPages.length === 1}
+                    title="Supprimer la page"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
 
