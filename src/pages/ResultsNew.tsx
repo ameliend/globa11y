@@ -181,9 +181,9 @@ const ResultsNew = () => {
       const pageNonCompliantAA = pageCriteria.filter((c: any) => c.status === 'non-compliant' && c.level === 'AA').length;
       const pageNotApplicableA = pageCriteria.filter((c: any) => c.status === 'not-applicable' && c.level === 'A').length;
       const pageNotApplicableAA = pageCriteria.filter((c: any) => c.status === 'not-applicable' && c.level === 'AA').length;
-      const pageTotal = pageCriteria.filter((c: any) => c.status !== 'not-applicable').length;
       const pageCompliantCount = pageCriteria.filter((c: any) => c.status === 'compliant').length;
-      const pagePercent = pageTotal > 0 ? Math.round((pageCompliantCount / pageTotal) * 100) : 0;
+      const pageNotApplicableCount = pageCriteria.filter((c: any) => c.status === 'not-applicable').length;
+      const pagePercent = Math.round(((pageCompliantCount + pageNotApplicableCount) / 55) * 100);
       
       return `      <tr>
         <th scope="row">${page.name}</th>
