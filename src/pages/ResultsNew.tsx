@@ -119,25 +119,46 @@ const ResultsNew = () => {
   };
 
   const generateAccessibilityStatement = (data: AccessibilityStatementData) => {
-    // Calculate detailed statistics by level
-    const allCriteria = pages.flatMap(p => p.criteria_results);
+    // Calculate detailed statistics by level - count unique criteria codes
+    const compliantCodesA = new Set<string>();
+    const compliantCodesAA = new Set<string>();
+    const nonCompliantCodesA = new Set<string>();
+    const nonCompliantCodesAA = new Set<string>();
+    const notApplicableCodesA = new Set<string>();
+    const notApplicableCodesAA = new Set<string>();
     
-    const compliantA = allCriteria.filter((c: any) => c.status === 'compliant' && c.level === 'A').length;
-    const compliantAA = allCriteria.filter((c: any) => c.status === 'compliant' && c.level === 'AA').length;
+    pages.forEach(page => {
+      page.criteria_results.forEach((c: any) => {
+        if (c.status === 'compliant') {
+          if (c.level === 'A') compliantCodesA.add(c.code);
+          if (c.level === 'AA') compliantCodesAA.add(c.code);
+        }
+        if (c.status === 'non-compliant') {
+          if (c.level === 'A') nonCompliantCodesA.add(c.code);
+          if (c.level === 'AA') nonCompliantCodesAA.add(c.code);
+        }
+        if (c.status === 'not-applicable') {
+          if (c.level === 'A') notApplicableCodesA.add(c.code);
+          if (c.level === 'AA') notApplicableCodesAA.add(c.code);
+        }
+      });
+    });
+    
+    const compliantA = compliantCodesA.size;
+    const compliantAA = compliantCodesAA.size;
     const totalCompliant = stats.compliant;
     
-    const nonCompliantA = allCriteria.filter((c: any) => c.status === 'non-compliant' && c.level === 'A').length;
-    const nonCompliantAA = allCriteria.filter((c: any) => c.status === 'non-compliant' && c.level === 'AA').length;
+    const nonCompliantA = nonCompliantCodesA.size;
+    const nonCompliantAA = nonCompliantCodesAA.size;
     const totalNonCompliant = stats.nonCompliant;
     
-    const notApplicableA = allCriteria.filter((c: any) => c.status === 'not-applicable' && c.level === 'A').length;
-    const notApplicableAA = allCriteria.filter((c: any) => c.status === 'not-applicable' && c.level === 'AA').length;
+    const notApplicableA = notApplicableCodesA.size;
+    const notApplicableAA = notApplicableCodesAA.size;
     const totalNotApplicable = stats.notApplicable;
     
     // Calculate percentages by level (only for applicable criteria)
     const totalApplicableA = compliantA + nonCompliantA;
     const totalApplicableAA = compliantAA + nonCompliantAA;
-    const totalApplicable = totalCompliant + totalNonCompliant;
     
     const percentCompliantA = totalApplicableA > 0 ? Math.round((compliantA / totalApplicableA) * 100) : 0;
     const percentCompliantAA = totalApplicableAA > 0 ? Math.round((compliantAA / totalApplicableAA) * 100) : 0;
