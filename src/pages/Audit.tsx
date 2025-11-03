@@ -258,7 +258,8 @@ const Audit = () => {
   const calculatePageScore = (page: AuditPage) => {
     const compliantCount = page.criteria.filter(c => c.status === 'compliant').length;
     const notApplicableCount = page.criteria.filter(c => c.status === 'not-applicable').length;
-    return Math.round(((compliantCount + notApplicableCount) / totalCriteria) * 100);
+    const denominator = totalCriteria - notApplicableCount;
+    return denominator > 0 ? Math.round((compliantCount / denominator) * 100) : 0;
   };
 
   const calculateOverallScore = () => {
@@ -272,7 +273,8 @@ const Audit = () => {
       });
     });
     
-    return Math.round(((compliantCodes.size + notApplicableCodes.size) / totalCriteria) * 100);
+    const denominator = totalCriteria - notApplicableCodes.size;
+    return denominator > 0 ? Math.round((compliantCodes.size / denominator) * 100) : 0;
   };
 
   const validateAudit = async () => {
@@ -287,7 +289,8 @@ const Audit = () => {
         });
       });
       
-      const score = Math.round(((compliantCodes.size + notApplicableCodes.size) / totalCriteria) * 100);
+      const denominator = totalCriteria - notApplicableCodes.size;
+      const score = denominator > 0 ? Math.round((compliantCodes.size / denominator) * 100) : 0;
 
       const { error } = await supabase
         .from('reports')

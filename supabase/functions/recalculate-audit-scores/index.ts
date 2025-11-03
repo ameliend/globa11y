@@ -19,13 +19,15 @@ serve(async (req) => {
     // Fetch all reports with their pages and criteria results
     const { data: reports, error: reportsError } = await supabase
       .from('reports')
-      .select('id, audit_pages(id, criteria_results(code, status))');
+      .select('id, audit_type, audit_pages(id, criteria_results(code, status))');
 
     if (reportsError) throw reportsError;
 
     const updates = [];
     
     for (const report of reports || []) {
+      const totalCriteria = report.audit_type === 'native-app' ? 48 : 55;
+      
       // Count unique compliant and not-applicable criteria codes across all pages
       const compliantCodes = new Set<string>();
       const notApplicableCodes = new Set<string>();
@@ -45,8 +47,9 @@ serve(async (req) => {
         }
       }
       
-      // Calculate new score: (unique compliant + unique not-applicable) / 55 * 100
-      const newScore = Math.round(((compliantCodes.size + notApplicableCodes.size) / 55) * 100);
+      // Calculate new score: unique compliant / (totalCriteria - unique not-applicable) * 100
+      const denominator = totalCriteria - notApplicableCodes.size;
+      const newScore = denominator > 0 ? Math.round((compliantCodes.size / denominator) * 100) : 0;
       
       // Update the report score
       const { error: updateError } = await supabase
@@ -81,7 +84,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,

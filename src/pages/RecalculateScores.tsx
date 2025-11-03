@@ -45,8 +45,9 @@ const RecalculateScores = () => {
           }
         }
         
-        // Calculate new score: (unique compliant + unique not-applicable) / totalCriteria * 100
-        const newScore = Math.round(((compliantCodes.size + notApplicableCodes.size) / totalCriteria) * 100);
+        // Calculate new score: unique compliant / (totalCriteria - unique not-applicable) * 100
+        const denominator = totalCriteria - notApplicableCodes.size;
+        const newScore = denominator > 0 ? Math.round((compliantCodes.size / denominator) * 100) : 0;
         
         // Update the report score
         const { error: updateError } = await supabase
@@ -88,7 +89,7 @@ const RecalculateScores = () => {
           <p className="text-muted-foreground">
             Cette page permet de recalculer tous les scores d'audit existants avec la nouvelle formule :
             <br />
-            <strong>Score = (Critères conformes uniques + Critères non applicables uniques) / (55 ou 48 selon le type) × 100</strong>
+            <strong>Score = Critères conformes uniques / (Total critères - Critères non applicables uniques) × 100</strong>
           </p>
           
           <Button 
