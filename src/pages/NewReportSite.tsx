@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Globe, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -15,6 +16,8 @@ const NewReportSite = () => {
   const [reportName, setReportName] = useState('');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
+  const [showTypeModal, setShowTypeModal] = useState(false);
+  const [selectedType, setSelectedType] = useState<'website' | 'native-app' | null>(null);
 
   useEffect(() => {
     fetchSite();
@@ -35,13 +38,18 @@ const NewReportSite = () => {
     }
   };
 
-  const handleCreateReport = async () => {
+  const handleStartAudit = () => {
     if (!reportName.trim()) {
       toast.error('Please enter a report name');
       return;
     }
+    setShowTypeModal(true);
+  };
 
+  const handleTypeSelect = async (type: 'website' | 'native-app') => {
+    setSelectedType(type);
     setLoading(true);
+    
     try {
       const { data, error } = await supabase
         .from('reports')
@@ -49,6 +57,7 @@ const NewReportSite = () => {
           site_id: siteId,
           name: reportName,
           start_date: startDate,
+          audit_type: type,
         }])
         .select()
         .single();
@@ -61,6 +70,7 @@ const NewReportSite = () => {
       toast.error('Failed to create report');
     } finally {
       setLoading(false);
+      setShowTypeModal(false);
     }
   };
 
@@ -114,13 +124,50 @@ const NewReportSite = () => {
               >
                 Cancel
               </Button>
-              <Button className="flex-1" onClick={handleCreateReport} disabled={loading}>
-                {loading ? 'Creating...' : 'Start Audit'}
+              <Button className="flex-1" onClick={handleStartAudit} disabled={loading}>
+                Start Audit
               </Button>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={showTypeModal} onOpenChange={setShowTypeModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Audit Type</DialogTitle>
+            <DialogDescription>
+              Choose the type of accessibility audit you want to perform
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <Button
+              variant="outline"
+              className="h-32 flex flex-col gap-2"
+              onClick={() => handleTypeSelect('website')}
+              disabled={loading}
+            >
+              <Globe className="h-8 w-8" />
+              <div className="text-center">
+                <div className="font-semibold">Website</div>
+                <div className="text-xs text-muted-foreground">55 criteria</div>
+              </div>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-32 flex flex-col gap-2"
+              onClick={() => handleTypeSelect('native-app')}
+              disabled={loading}
+            >
+              <Smartphone className="h-8 w-8" />
+              <div className="text-center">
+                <div className="font-semibold">Native App</div>
+                <div className="text-xs text-muted-foreground">48 criteria</div>
+              </div>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

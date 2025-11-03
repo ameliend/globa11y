@@ -17,13 +17,15 @@ const RecalculateScores = () => {
       // Fetch all reports with their pages and criteria results
       const { data: reports, error: reportsError } = await supabase
         .from('reports')
-        .select('id, name, score, audit_pages(id, criteria_results(code, status))');
+        .select('id, name, score, audit_type, audit_pages(id, criteria_results(code, status))');
 
       if (reportsError) throw reportsError;
 
       const updates = [];
 
       for (const report of reports || []) {
+        const totalCriteria = report.audit_type === 'native-app' ? 48 : 55;
+        
         // Count unique compliant and not-applicable criteria codes across all pages
         const compliantCodes = new Set<string>();
         const notApplicableCodes = new Set<string>();
@@ -43,8 +45,8 @@ const RecalculateScores = () => {
           }
         }
         
-        // Calculate new score: (unique compliant + unique not-applicable) / 55 * 100
-        const newScore = Math.round(((compliantCodes.size + notApplicableCodes.size) / 55) * 100);
+        // Calculate new score: (unique compliant + unique not-applicable) / totalCriteria * 100
+        const newScore = Math.round(((compliantCodes.size + notApplicableCodes.size) / totalCriteria) * 100);
         
         // Update the report score
         const { error: updateError } = await supabase
@@ -86,7 +88,7 @@ const RecalculateScores = () => {
           <p className="text-muted-foreground">
             Cette page permet de recalculer tous les scores d'audit existants avec la nouvelle formule :
             <br />
-            <strong>Score = (Critères conformes uniques + Critères non applicables uniques) / 55 × 100</strong>
+            <strong>Score = (Critères conformes uniques + Critères non applicables uniques) / (55 ou 48 selon le type) × 100</strong>
           </p>
           
           <Button 

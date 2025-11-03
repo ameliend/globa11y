@@ -58,13 +58,14 @@ const Site = () => {
       if (error) throw error;
 
       const completedReports = data?.filter(r => r.status === 'completed') || [];
+      // Get the overall score from the most recent completed report
       const lastScore = completedReports.length > 0 ? completedReports[0].score || 0 : 0;
 
       setReports(data || []);
       setStats({
         total: data?.length || 0,
         completed: completedReports.length,
-        lastScore,
+        lastScore, // This is already the overall score stored in the report
       });
     } catch (error: any) {
       toast.error('Failed to fetch reports');
@@ -236,7 +237,7 @@ const Site = () => {
                     }`}>
                       {report.status}
                     </span>
-                    {report.score !== undefined && (
+                    {report.score !== undefined && report.status === 'completed' && (
                       <p className="text-2xl font-bold mt-2">{Math.round(report.score)}%</p>
                     )}
                   </div>

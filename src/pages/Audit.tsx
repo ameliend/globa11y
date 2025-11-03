@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useApp, AuditPage, CriteriaResult } from '@/contexts/AppContext';
 import { wcagCriteria } from '@/data/wcagCriteria';
+import { wcagCriteriaNativeApp } from '@/data/wcagCriteriaNativeApp';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Select,
   SelectContent,
@@ -23,82 +24,206 @@ import {
 } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 
+interface CriteriaResult {
+  id?: string;
+  code: string;
+  title: string;
+  level: string;
+  status: 'compliant' | 'non-compliant' | 'not-applicable';
+  observation: string;
+}
+
+interface AuditPage {
+  id: string;
+  name: string;
+  criteria: CriteriaResult[];
+}
+
 const Audit = () => {
   const { reportId } = useParams();
   const navigate = useNavigate();
-  const { getReportById, updateReport } = useApp();
   
-  const report = getReportById(reportId!);
-  const [currentPages, setCurrentPages] = useState<AuditPage[]>(report?.pages || []);
+  const [report, setReport] = useState<any>(null);
+  const [currentPages, setCurrentPages] = useState<AuditPage[]>([]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [pageName, setPageName] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const totalCriteria = report?.audit_type === 'native-app' ? 48 : 55;
+  const criteriaList = report?.audit_type === 'native-app' ? wcagCriteriaNativeApp : wcagCriteria;
 
   useEffect(() => {
-    if (report) {
-      setCurrentPages(report.pages);
-      if (report.pages.length > 0 && !pageName) {
-        setPageName(report.pages[currentPageIndex]?.name || '');
+    fetchReport();
+  }, [reportId]);
+
+  const fetchReport = async () => {
+    try {
+      const { data: reportData, error: reportError } = await supabase
+        .from('reports')
+        .select('*, sites(*, entities(*))')
+        .eq('id', reportId)
+        .single();
+
+      if (reportError) throw reportError;
+      setReport(reportData);
+
+      const { data: pagesData, error: pagesError } = await supabase
+        .from('audit_pages')
+        .select('*, criteria_results(*)')
+        .eq('report_id', reportId)
+        .order('created_at', { ascending: true });
+
+      if (pagesError) throw pagesError;
+
+      if (pagesData && pagesData.length > 0) {
+        const pages = pagesData.map((page: any) => ({
+          id: page.id,
+          name: page.name,
+          criteria: page.criteria_results.map((c: any) => ({
+            id: c.id,
+            code: c.code,
+            title: c.title,
+            level: c.level,
+            status: c.status,
+            observation: c.observation || '',
+          })),
+        }));
+        setCurrentPages(pages);
       }
+    } catch (error: any) {
+      toast.error('Failed to fetch audit');
+    } finally {
+      setLoading(false);
     }
-  }, [report, currentPageIndex]);
+  };
 
-  if (!report) {
-    return null;
-  }
-
-  const currentPage = currentPages[currentPageIndex];
-
-  const initializePage = () => {
+  const initializePage = async () => {
     if (!pageName.trim()) {
       toast.error('Veuillez nommer la page');
       return;
     }
 
-    const newPage: AuditPage = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: pageName,
-      criteria: wcagCriteria.map(criterion => ({
-        id: criterion.ref_id,
+    try {
+      // Create audit page
+      const { data: pageData, error: pageError } = await supabase
+        .from('audit_pages')
+        .insert([{
+          report_id: reportId,
+          name: pageName,
+        }])
+        .select()
+        .single();
+
+      if (pageError) throw pageError;
+
+      // Create all criteria results for this page
+      const criteriaToInsert = criteriaList.map(criterion => ({
+        page_id: pageData.id,
         code: criterion.ref_id,
         title: criterion.title,
         level: criterion.level,
-        status: 'not-applicable' as const,
+        status: 'not-applicable',
         observation: '',
-      })),
-    };
+      }));
 
-    const updatedPages = [...currentPages, newPage];
-    setCurrentPages(updatedPages);
-    setCurrentPageIndex(updatedPages.length - 1);
-    setPageName('');
-    toast.success('Page ajoutée');
-  };
+      const { data: criteriaData, error: criteriaError } = await supabase
+        .from('criteria_results')
+        .insert(criteriaToInsert)
+        .select();
 
-  const updateCriteriaStatus = (criteriaId: string, status: CriteriaResult['status']) => {
-    const updatedPages = [...currentPages];
-    const criterion = updatedPages[currentPageIndex].criteria.find(c => c.id === criteriaId);
-    if (criterion) {
-      criterion.status = status;
+      if (criteriaError) throw criteriaError;
+
+      const newPage: AuditPage = {
+        id: pageData.id,
+        name: pageName,
+        criteria: criteriaData.map((c: any) => ({
+          id: c.id,
+          code: c.code,
+          title: c.title,
+          level: c.level,
+          status: c.status,
+          observation: c.observation || '',
+        })),
+      };
+
+      const updatedPages = [...currentPages, newPage];
       setCurrentPages(updatedPages);
+      setCurrentPageIndex(updatedPages.length - 1);
+      setPageName('');
+      
+      // Update report status
+      await supabase
+        .from('reports')
+        .update({ status: 'in-progress' })
+        .eq('id', reportId);
+
+      toast.success('Page ajoutée');
+    } catch (error: any) {
+      toast.error('Failed to add page');
     }
   };
 
-  const updateCriteriaObservation = (criteriaId: string, observation: string) => {
-    const updatedPages = [...currentPages];
-    const criterion = updatedPages[currentPageIndex].criteria.find(c => c.id === criteriaId);
-    if (criterion) {
-      criterion.observation = observation;
-      setCurrentPages(updatedPages);
+  const updateCriteriaStatus = async (criteriaDbId: string, status: CriteriaResult['status']) => {
+    try {
+      const { error } = await supabase
+        .from('criteria_results')
+        .update({ status })
+        .eq('id', criteriaDbId);
+
+      if (error) throw error;
+
+      // Update local state
+      const updatedPages = [...currentPages];
+      const criterion = updatedPages[currentPageIndex].criteria.find(c => c.id === criteriaDbId);
+      if (criterion) {
+        criterion.status = status;
+        setCurrentPages(updatedPages);
+      }
+    } catch (error: any) {
+      toast.error('Failed to update status');
     }
   };
 
-  const addNewPage = () => {
-    updateReport(reportId!, { pages: currentPages, status: 'in-progress' });
-    setPageName('');
-    setCurrentPageIndex(currentPages.length);
+  const updateCriteriaObservation = async (criteriaDbId: string, observation: string) => {
+    try {
+      const { error } = await supabase
+        .from('criteria_results')
+        .update({ observation })
+        .eq('id', criteriaDbId);
+
+      if (error) throw error;
+
+      // Update local state
+      const updatedPages = [...currentPages];
+      const criterion = updatedPages[currentPageIndex].criteria.find(c => c.id === criteriaDbId);
+      if (criterion) {
+        criterion.observation = observation;
+        setCurrentPages(updatedPages);
+      }
+    } catch (error: any) {
+      toast.error('Failed to update observation');
+    }
   };
 
-  const deletePage = (pageIndex: number) => {
+  const updatePageName = async (newName: string) => {
+    try {
+      const currentPage = currentPages[currentPageIndex];
+      const { error } = await supabase
+        .from('audit_pages')
+        .update({ name: newName })
+        .eq('id', currentPage.id);
+
+      if (error) throw error;
+
+      const updatedPages = [...currentPages];
+      updatedPages[currentPageIndex].name = newName;
+      setCurrentPages(updatedPages);
+    } catch (error: any) {
+      toast.error('Failed to update page name');
+    }
+  };
+
+  const deletePage = async (pageIndex: number) => {
     if (currentPages.length === 1) {
       toast.error('Impossible de supprimer la dernière page');
       return;
@@ -108,22 +233,32 @@ const Audit = () => {
       return;
     }
 
-    const updatedPages = currentPages.filter((_, index) => index !== pageIndex);
-    setCurrentPages(updatedPages);
-    updateReport(reportId!, { pages: updatedPages });
-    
-    // Adjust current page index if needed
-    if (currentPageIndex >= updatedPages.length) {
-      setCurrentPageIndex(Math.max(0, updatedPages.length - 1));
+    try {
+      const pageToDelete = currentPages[pageIndex];
+      const { error } = await supabase
+        .from('audit_pages')
+        .delete()
+        .eq('id', pageToDelete.id);
+
+      if (error) throw error;
+
+      const updatedPages = currentPages.filter((_, index) => index !== pageIndex);
+      setCurrentPages(updatedPages);
+      
+      if (currentPageIndex >= updatedPages.length) {
+        setCurrentPageIndex(Math.max(0, updatedPages.length - 1));
+      }
+      
+      toast.success('Page supprimée');
+    } catch (error: any) {
+      toast.error('Failed to delete page');
     }
-    
-    toast.success('Page supprimée');
   };
 
   const calculatePageScore = (page: AuditPage) => {
     const compliantCount = page.criteria.filter(c => c.status === 'compliant').length;
     const notApplicableCount = page.criteria.filter(c => c.status === 'not-applicable').length;
-    return Math.round(((compliantCount + notApplicableCount) / 55) * 100);
+    return Math.round(((compliantCount + notApplicableCount) / totalCriteria) * 100);
   };
 
   const calculateOverallScore = () => {
@@ -137,31 +272,38 @@ const Audit = () => {
       });
     });
     
-    return Math.round(((compliantCodes.size + notApplicableCodes.size) / 55) * 100);
+    return Math.round(((compliantCodes.size + notApplicableCodes.size) / totalCriteria) * 100);
   };
 
-  const validateAudit = () => {
-    // Count unique criteria codes across all pages
-    const compliantCodes = new Set<string>();
-    const notApplicableCodes = new Set<string>();
-    
-    currentPages.forEach(page => {
-      page.criteria.forEach(c => {
-        if (c.status === 'compliant') compliantCodes.add(c.code);
-        if (c.status === 'not-applicable') notApplicableCodes.add(c.code);
+  const validateAudit = async () => {
+    try {
+      const compliantCodes = new Set<string>();
+      const notApplicableCodes = new Set<string>();
+      
+      currentPages.forEach(page => {
+        page.criteria.forEach(c => {
+          if (c.status === 'compliant') compliantCodes.add(c.code);
+          if (c.status === 'not-applicable') notApplicableCodes.add(c.code);
+        });
       });
-    });
-    
-    const score = Math.round(((compliantCodes.size + notApplicableCodes.size) / 55) * 100);
+      
+      const score = Math.round(((compliantCodes.size + notApplicableCodes.size) / totalCriteria) * 100);
 
-    updateReport(reportId!, { 
-      pages: currentPages, 
-      status: 'completed',
-      score 
-    });
+      const { error } = await supabase
+        .from('reports')
+        .update({ 
+          status: 'completed',
+          score 
+        })
+        .eq('id', reportId);
 
-    toast.success('Audit validé avec succès');
-    navigate(`/results/${reportId}`);
+      if (error) throw error;
+
+      toast.success('Audit validé avec succès');
+      navigate(`/results/${reportId}`);
+    } catch (error: any) {
+      toast.error('Failed to validate audit');
+    }
   };
 
   const getStatusIcon = (status: CriteriaResult['status']) => {
@@ -175,21 +317,30 @@ const Audit = () => {
     }
   };
 
+  if (loading || !report) {
+    return null;
+  }
+
+  const currentPage = currentPages[currentPageIndex];
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto py-8 px-4">
         <Button
           variant="ghost"
           className="mb-6"
-          onClick={() => navigate(`/entity/${report.entityId}`)}
+          onClick={() => navigate(`/site/${report.sites.id}`)}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Retour au dashboard
+          Retour au site
         </Button>
 
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">Audit : {report.name}</h1>
-          <p className="text-muted-foreground">{report.url}</p>
+          <p className="text-muted-foreground">{report.sites.url}</p>
+          <Badge variant="outline" className="mt-2">
+            {report.audit_type === 'native-app' ? 'Native App (48 critères)' : 'Website (55 critères)'}
+          </Badge>
         </div>
 
         {currentPages.length === 0 || currentPageIndex >= currentPages.length ? (
@@ -243,11 +394,7 @@ const Audit = () => {
                   <Input
                     id="current-page-name"
                     value={currentPage.name}
-                    onChange={(e) => {
-                      const updatedPages = [...currentPages];
-                      updatedPages[currentPageIndex].name = e.target.value;
-                      setCurrentPages(updatedPages);
-                    }}
+                    onChange={(e) => updatePageName(e.target.value)}
                     className="text-lg font-semibold"
                   />
                 </div>
@@ -288,7 +435,7 @@ const Audit = () => {
 
             <div className="space-y-4 mb-6">
               {currentPage.criteria.map((criterion) => {
-                const wcagInfo = wcagCriteria.find(w => w.ref_id === criterion.code);
+                const wcagInfo = criteriaList.find(w => w.ref_id === criterion.code);
                 return (
                   <Card key={criterion.id}>
                     <CardContent className="p-6">
@@ -312,7 +459,7 @@ const Audit = () => {
                             <Select
                               value={criterion.status}
                               onValueChange={(value) => 
-                                updateCriteriaStatus(criterion.id, value as CriteriaResult['status'])
+                                updateCriteriaStatus(criterion.id!, value as CriteriaResult['status'])
                               }
                             >
                               <SelectTrigger>
@@ -332,7 +479,7 @@ const Audit = () => {
                               placeholder="Ajoutez vos observations..."
                               value={criterion.observation}
                               onChange={(e) => 
-                                updateCriteriaObservation(criterion.id, e.target.value)
+                                updateCriteriaObservation(criterion.id!, e.target.value)
                               }
                               rows={2}
                             />
@@ -367,7 +514,7 @@ const Audit = () => {
             </div>
 
             <div className="flex gap-3 sticky bottom-6">
-              <Button variant="outline" size="lg" onClick={addNewPage}>
+              <Button variant="outline" size="lg" onClick={() => setCurrentPageIndex(currentPages.length)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Ajouter une page
               </Button>

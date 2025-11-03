@@ -23,6 +23,8 @@ const ResultsNew = () => {
   const [nonCompliances, setNonCompliances] = useState<NonCompliance[]>([]);
   const [stats, setStats] = useState({ compliant: 0, nonCompliant: 0, notApplicable: 0 });
 
+  const totalCriteria = report?.audit_type === 'native-app' ? 48 : 55;
+
   useEffect(() => {
     fetchResults();
   }, [reportId]);
@@ -162,7 +164,7 @@ const ResultsNew = () => {
     
     const percentCompliantA = totalApplicableA > 0 ? Math.round((compliantA / totalApplicableA) * 100) : 0;
     const percentCompliantAA = totalApplicableAA > 0 ? Math.round((compliantAA / totalApplicableAA) * 100) : 0;
-    const percentCompliant = Math.round(((stats.compliant + stats.notApplicable) / 55) * 100);
+    const percentCompliant = Math.round(((stats.compliant + stats.notApplicable) / totalCriteria) * 100);
     
     // Generate page list
     const pageList = pages.map(p => `<li>${p.name}</li>`).join('\n');
@@ -183,7 +185,7 @@ const ResultsNew = () => {
       const pageNotApplicableAA = pageCriteria.filter((c: any) => c.status === 'not-applicable' && c.level === 'AA').length;
       const pageCompliantCount = pageCriteria.filter((c: any) => c.status === 'compliant').length;
       const pageNotApplicableCount = pageCriteria.filter((c: any) => c.status === 'not-applicable').length;
-      const pagePercent = Math.round(((pageCompliantCount + pageNotApplicableCount) / 55) * 100);
+      const pagePercent = Math.round(((pageCompliantCount + pageNotApplicableCount) / totalCriteria) * 100);
       
       return `      <tr>
         <th scope="row">${page.name}</th>
@@ -440,7 +442,7 @@ ${nonCompliantList}
           </CardHeader>
           <CardContent>
             <p className="text-5xl font-bold text-foreground">
-              {Math.round(((stats.compliant + stats.notApplicable) / 55) * 100)}%
+              {Math.round(((stats.compliant + stats.notApplicable) / totalCriteria) * 100)}%
             </p>
           </CardContent>
         </Card>
@@ -480,7 +482,7 @@ ${nonCompliantList}
               const pageCompliant = page.criteria_results.filter((c: any) => c.status === 'compliant').length;
               const pageNonCompliant = page.criteria_results.filter((c: any) => c.status === 'non-compliant').length;
               const pageNotApplicable = page.criteria_results.filter((c: any) => c.status === 'not-applicable').length;
-              const pageScore = Math.round(((pageCompliant + pageNotApplicable) / 55) * 100);
+              const pageScore = Math.round(((pageCompliant + pageNotApplicable) / totalCriteria) * 100);
 
               return (
                 <div key={page.id} className="flex justify-between items-center p-4 border rounded-lg">

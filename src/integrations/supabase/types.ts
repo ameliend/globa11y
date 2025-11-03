@@ -129,6 +129,7 @@ export type Database = {
       reports: {
         Row: {
           assistive_tech: string | null
+          audit_type: string | null
           auditor_name: string | null
           automated_tests: string | null
           browsers_devices: string | null
@@ -143,6 +144,7 @@ export type Database = {
         }
         Insert: {
           assistive_tech?: string | null
+          audit_type?: string | null
           auditor_name?: string | null
           automated_tests?: string | null
           browsers_devices?: string | null
@@ -157,6 +159,7 @@ export type Database = {
         }
         Update: {
           assistive_tech?: string | null
+          audit_type?: string | null
           auditor_name?: string | null
           automated_tests?: string | null
           browsers_devices?: string | null
