@@ -12,7 +12,7 @@ export interface WCAGCriterion {
   special_cases?: SpecialCase[];
 }
 
-// Native App specific WCAG criteria (48 criteria total)
+// Native App specific WCAG criteria (41 criteria total after removing 2.4.1, 2.4.2, 2.4.5, 3.1.2, 3.2.3, 3.2.4, 3.2.6)
 export const wcagCriteriaNativeApp: WCAGCriterion[] = [
   // Perceivable
   {

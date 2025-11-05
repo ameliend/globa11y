@@ -162,7 +162,7 @@ const NewReportSite = () => {
               <Smartphone className="h-8 w-8" />
               <div className="text-center">
                 <div className="font-semibold">Native App</div>
-                <div className="text-xs text-muted-foreground">48 criteria</div>
+                <div className="text-xs text-muted-foreground">41 criteria</div>
               </div>
             </Button>
           </div>

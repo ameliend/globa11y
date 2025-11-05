@@ -24,7 +24,7 @@ const ResultsNew = () => {
   const [nonCompliances, setNonCompliances] = useState<NonCompliance[]>([]);
   const [stats, setStats] = useState({ compliant: 0, nonCompliant: 0, notApplicable: 0 });
 
-  const totalCriteria = report?.audit_type === 'native-app' ? 48 : 55;
+  const totalCriteria = report?.audit_type === 'native-app' ? 41 : 55;
 
   useEffect(() => {
     fetchResults();

@@ -49,7 +49,7 @@ const Audit = () => {
   const [pageName, setPageName] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const totalCriteria = report?.audit_type === 'native-app' ? 48 : 55;
+  const totalCriteria = report?.audit_type === 'native-app' ? 41 : 55;
   const criteriaList = report?.audit_type === 'native-app' ? wcagCriteriaNativeApp : wcagCriteria;
 
   useEffect(() => {
@@ -349,7 +349,7 @@ const Audit = () => {
           <h1 className="text-3xl font-bold text-foreground mb-2">Audit : {report.name}</h1>
           <p className="text-muted-foreground">{report.sites.url}</p>
           <Badge variant="outline" className="mt-2">
-            {report.audit_type === 'native-app' ? 'Native App (48 critères)' : 'Website (55 critères)'}
+            {report.audit_type === 'native-app' ? 'Native App (41 critères)' : 'Website (55 critères)'}
           </Badge>
         </div>
 

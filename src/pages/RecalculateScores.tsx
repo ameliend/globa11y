@@ -25,7 +25,7 @@ const RecalculateScores = () => {
       const updates = [];
 
       for (const report of reports || []) {
-        const totalCriteria = report.audit_type === 'native-app' ? 48 : 55;
+        const totalCriteria = report.audit_type === 'native-app' ? 41 : 55;
         
         // Count unique compliant and not-applicable criteria codes across all pages
         const compliantCodes = new Set<string>();
@@ -90,7 +90,7 @@ const RecalculateScores = () => {
           <p className="text-muted-foreground">
             Cette page permet de recalculer tous les scores d'audit existants avec la nouvelle formule :
             <br />
-            <strong>Score = Critères conformes uniques / (Total critères - Critères non applicables uniques) × 100</strong>
+            <strong>Score = Critères conformes uniques / (Total critères [55 Website ou 41 Native App] - Critères non applicables uniques) × 100</strong>
           </p>
           
           <Button 

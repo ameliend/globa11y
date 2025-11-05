@@ -26,7 +26,7 @@ serve(async (req) => {
     const updates = [];
     
     for (const report of reports || []) {
-      const totalCriteria = report.audit_type === 'native-app' ? 48 : 55;
+      const totalCriteria = report.audit_type === 'native-app' ? 41 : 55;
       
       // Count unique compliant and not-applicable criteria codes across all pages
       const compliantCodes = new Set<string>();
