@@ -292,6 +292,12 @@ export const wcagCriteriaNativeApp: WCAGCriterion[] = [
   
   // Robust
   {
+    ref_id: '4.1.1',
+    title: 'Parsing',
+    level: 'A',
+    description: 'In content implemented using markup languages, elements have complete start and end tags, elements are nested according to their specifications, elements do not contain duplicate attributes, and any IDs are unique.'
+  },
+  {
     ref_id: '4.1.2',
     title: 'Name, Role, Value',
     level: 'A',
