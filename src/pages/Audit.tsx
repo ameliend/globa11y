@@ -256,8 +256,12 @@ const Audit = () => {
   };
 
   const calculatePageScore = (page: AuditPage) => {
-    const compliantCount = page.criteria.filter(c => c.status === 'compliant').length;
-    const notApplicableCount = page.criteria.filter(c => c.status === 'not-applicable').length;
+    const filteredCriteria = report?.audit_type === 'native-app'
+      ? page.criteria.filter(c => criteriaList.some(w => w.ref_id === c.code))
+      : page.criteria;
+
+    const compliantCount = filteredCriteria.filter(c => c.status === 'compliant').length;
+    const notApplicableCount = filteredCriteria.filter(c => c.status === 'not-applicable').length;
     const denominator = totalCriteria - notApplicableCount;
     return denominator > 0 ? Math.round((compliantCount / denominator) * 100) : 0;
   };
@@ -265,9 +269,12 @@ const Audit = () => {
   const calculateOverallScore = () => {
     const compliantCodes = new Set<string>();
     const notApplicableCodes = new Set<string>();
+    const isNative = report?.audit_type === 'native-app';
+    const allowedSet = isNative ? new Set(criteriaList.map(c => c.ref_id)) : null;
     
     currentPages.forEach(page => {
       page.criteria.forEach(c => {
+        if (isNative && !(allowedSet as Set<string>).has(c.code)) return;
         if (c.status === 'compliant') compliantCodes.add(c.code);
         if (c.status === 'not-applicable') notApplicableCodes.add(c.code);
       });
@@ -437,7 +444,10 @@ const Audit = () => {
             </div>
 
             <div className="space-y-4 mb-6">
-              {currentPage.criteria.map((criterion) => {
+              {(report.audit_type === 'native-app' 
+                ? currentPage.criteria.filter(c => criteriaList.some(w => w.ref_id === c.code))
+                : currentPage.criteria
+              ).map((criterion) => {
                 const wcagInfo = criteriaList.find(w => w.ref_id === criterion.code);
                 return (
                   <Card key={criterion.id}>

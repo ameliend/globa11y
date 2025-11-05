@@ -6,6 +6,7 @@ import { ArrowLeft, Edit, Trash2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { AccessibilityStatementData } from '@/components/AccessibilityStatementModal';
+import { wcagCriteriaNativeApp } from '@/data/wcagCriteriaNativeApp';
 
 interface NonCompliance {
   code: string;
@@ -48,15 +49,17 @@ const ResultsNew = () => {
       if (pagesError) throw pagesError;
       setPages(pagesData || []);
 
-      // Calculate stats - count unique criteria codes across all pages
-      const uniqueCriteriaCodes = new Set<string>();
+      // Calculate stats - count unique criteria codes across all pages (filtering for Native App)
+      const isNative = reportData.audit_type === 'native-app';
+      const allowedSet = isNative ? new Set(wcagCriteriaNativeApp.map(c => c.ref_id)) : null;
+      
       const compliantCodes = new Set<string>();
       const nonCompliantCodes = new Set<string>();
       const notApplicableCodes = new Set<string>();
       
       pagesData?.forEach((page: any) => {
         page.criteria_results.forEach((c: any) => {
-          uniqueCriteriaCodes.add(c.code);
+          if (isNative && !(allowedSet as Set<string>).has(c.code)) return;
           if (c.status === 'compliant') compliantCodes.add(c.code);
           if (c.status === 'non-compliant') nonCompliantCodes.add(c.code);
           if (c.status === 'not-applicable') notApplicableCodes.add(c.code);
@@ -72,7 +75,7 @@ const ResultsNew = () => {
       const nonComplianceMap: Record<string, NonCompliance> = {};
       pagesData?.forEach((page: any) => {
         page.criteria_results
-          .filter((c: any) => c.status === 'non-compliant')
+          .filter((c: any) => c.status === 'non-compliant' && (!isNative || (allowedSet as Set<string>).has(c.code)))
           .forEach((c: any) => {
             if (!nonComplianceMap[c.code]) {
               nonComplianceMap[c.code] = {
@@ -121,6 +124,8 @@ const ResultsNew = () => {
   };
 
   const generateAccessibilityStatement = (data: AccessibilityStatementData) => {
+    const isNative = report.audit_type === 'native-app';
+    const allowedSet = isNative ? new Set(wcagCriteriaNativeApp.map(c => c.ref_id)) : null;
     // Calculate detailed statistics by level - count unique criteria codes
     const compliantCodesA = new Set<string>();
     const compliantCodesAA = new Set<string>();
@@ -177,7 +182,8 @@ const ResultsNew = () => {
     
     // Generate page statistics table rows
     const pageRows = pages.map(page => {
-      const pageCriteria = page.criteria_results;
+      const allPageCriteria = page.criteria_results;
+      const pageCriteria = isNative ? allPageCriteria.filter((c: any) => (allowedSet as Set<string>).has(c.code)) : allPageCriteria;
       const pageCompliantA = pageCriteria.filter((c: any) => c.status === 'compliant' && c.level === 'A').length;
       const pageCompliantAA = pageCriteria.filter((c: any) => c.status === 'compliant' && c.level === 'AA').length;
       const pageNonCompliantA = pageCriteria.filter((c: any) => c.status === 'non-compliant' && c.level === 'A').length;
