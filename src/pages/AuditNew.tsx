@@ -99,8 +99,12 @@ const AuditNew = () => {
   };
 
   const getPrincipleForCriteria = (code: string): string => {
+    // Native app overrides: 3.14–3.17 belong to Perceivable
+    const perceivableOverrides = new Set(['3.14', '3.15', '3.16', '3.17']);
+    if (perceivableOverrides.has(code)) return 'Perceivable';
+
     const principleNum = code.split('.')[0];
-    const principles: any = {
+    const principles: Record<string, string> = {
       '1': 'Perceivable',
       '2': 'Operable',
       '3': 'Understandable',
@@ -108,7 +112,6 @@ const AuditNew = () => {
     };
     return principles[principleNum] || 'Other';
   };
-
   const getDescriptionForCriteria = (code: string): string => {
     // Prefer Native App descriptions when available
     const native = wcagCriteriaNativeApp.find(c => c.ref_id === code);

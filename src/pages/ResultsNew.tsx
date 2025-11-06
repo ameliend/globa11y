@@ -49,26 +49,33 @@ const ResultsNew = () => {
       if (pagesError) throw pagesError;
       setPages(pagesData || []);
 
-      // Calculate stats - count unique criteria codes across all pages (filtering for Native App)
+      // Calculate stats by aggregating each criterion code across pages (filter Native App to allowed set)
       const isNative = reportData.audit_type === 'native-app';
       const allowedSet = isNative ? new Set(wcagCriteriaNativeApp.map(c => c.ref_id)) : null;
       
-      const compliantCodes = new Set<string>();
-      const nonCompliantCodes = new Set<string>();
-      const notApplicableCodes = new Set<string>();
+      const perCodeStatus = new Map<string, { hasCompliant: boolean; hasNonCompliant: boolean; seen: boolean }>();
       
       pagesData?.forEach((page: any) => {
         page.criteria_results.forEach((c: any) => {
           if (isNative && !(allowedSet as Set<string>).has(c.code)) return;
-          if (c.status === 'compliant') compliantCodes.add(c.code);
-          if (c.status === 'non-compliant') nonCompliantCodes.add(c.code);
-          if (c.status === 'not-applicable') notApplicableCodes.add(c.code);
+          const entry = perCodeStatus.get(c.code) || { hasCompliant: false, hasNonCompliant: false, seen: false };
+          if (c.status === 'compliant') entry.hasCompliant = true;
+          if (c.status === 'non-compliant') entry.hasNonCompliant = true;
+          entry.seen = true;
+          perCodeStatus.set(c.code, entry);
         });
       });
       
-      const compliant = compliantCodes.size;
-      const nonCompliant = nonCompliantCodes.size;
-      const notApplicable = notApplicableCodes.size;
+      let compliant = 0;
+      let nonCompliant = 0;
+      let notApplicable = 0;
+      
+      perCodeStatus.forEach((v) => {
+        if (v.hasCompliant) compliant += 1;
+        else if (v.hasNonCompliant) nonCompliant += 1;
+        else notApplicable += 1;
+      });
+      
       setStats({ compliant, nonCompliant, notApplicable });
 
       // Group non-compliances by criteria (count same criterion on multiple pages as one)
@@ -451,9 +458,12 @@ ${nonCompliantList}
           <CardContent>
             <p className="text-5xl font-bold text-foreground">
               {(() => {
-                const denominator = totalCriteria - stats.notApplicable;
+                const denominator = stats.compliant + stats.nonCompliant;
                 return denominator > 0 ? Math.round((stats.compliant / denominator) * 100) : 0;
               })()}%
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {stats.compliant} / {stats.compliant + stats.nonCompliant} conformes
             </p>
           </CardContent>
         </Card>
@@ -490,21 +500,23 @@ ${nonCompliantList}
         <CardContent>
           <div className="space-y-4">
             {pages.map((page) => {
-              const pageCompliant = page.criteria_results.filter((c: any) => c.status === 'compliant').length;
-              const pageNonCompliant = page.criteria_results.filter((c: any) => c.status === 'non-compliant').length;
-              const pageNotApplicable = page.criteria_results.filter((c: any) => c.status === 'not-applicable').length;
-              const pageDenominator = totalCriteria - pageNotApplicable;
-              const pageScore = pageDenominator > 0 ? Math.round((pageCompliant / pageDenominator) * 100) : 0;
+              const isNative = report?.audit_type === 'native-app';
+              const allowedSet = isNative ? new Set(wcagCriteriaNativeApp.map(c => c.ref_id)) : null;
+              const allPageCriteria = page.criteria_results as any[];
+              const pageCriteria = isNative ? allPageCriteria.filter((c: any) => (allowedSet as Set<string>).has(c.code)) : allPageCriteria;
+              const pageApplicable = pageCriteria.filter((c: any) => c.status !== 'not-applicable').length;
+              const pageCompliant = pageCriteria.filter((c: any) => c.status === 'compliant').length;
+              const pageScore = pageApplicable > 0 ? Math.round((pageCompliant / pageApplicable) * 100) : 0;
 
               return (
                 <div key={page.id} className="flex justify-between items-center p-4 border rounded-lg">
                   <div>
                     <h3 className="font-semibold">{page.name}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {pageCompliant} compliant / {pageNonCompliant} non-compliant
+                      {pageCompliant} / {pageApplicable} conformes
                     </p>
                   </div>
-                  <p className="text-2xl font-bold">{Math.round(pageScore)}%</p>
+                  <p className="text-2xl font-bold">{pageScore}%</p>
                 </div>
               );
             })}
