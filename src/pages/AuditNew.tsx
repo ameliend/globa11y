@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { wcagCriteria } from '@/data/wcagCriteria';
+import { wcagCriteriaNativeApp } from '@/data/wcagCriteriaNativeApp';
 import wcagFullData from '@/data/wcag-full.json';
 import { howToTest } from '@/data/howToTest';
 import { Collapsible as CollapsiblePrimitive, CollapsibleContent as CollapsibleContentPrimitive, CollapsibleTrigger as CollapsibleTriggerPrimitive } from '@/components/ui/collapsible';
@@ -109,6 +110,9 @@ const AuditNew = () => {
   };
 
   const getDescriptionForCriteria = (code: string): string => {
+    // Prefer Native App descriptions when available
+    const native = wcagCriteriaNativeApp.find(c => c.ref_id === code);
+    if (native?.description) return native.description;
     for (const principle of wcagFullData as any[]) {
       for (const guideline of principle.guidelines) {
         const criterion = guideline.success_criteria?.find((sc: any) => sc.ref_id === code);
@@ -121,7 +125,10 @@ const AuditNew = () => {
   };
 
   const initializePage = (duplicateFromPage?: AuditPage) => {
-    const baseCriteria = wcagCriteria.map((c) => {
+    const isNative = report?.audit_type === 'native-app';
+    const criteriaSource = isNative ? wcagCriteriaNativeApp : wcagCriteria;
+
+    const baseCriteria = criteriaSource.map((c) => {
       const principle = getPrincipleForCriteria(c.ref_id);
       const description = getDescriptionForCriteria(c.ref_id);
       return {
@@ -487,7 +494,14 @@ const AuditNew = () => {
 
           {currentPage && (
             <Accordion type="multiple" className="space-y-4">
-              {Object.entries(groupCriteriaByPrinciple(currentPage.criteria)).map(([principle, criteria]) => {
+              {Object.entries(
+                groupCriteriaByPrinciple(
+                  (report.audit_type === 'native-app'
+                    ? currentPage.criteria.filter(c => (new Set(wcagCriteriaNativeApp.map(sc => sc.ref_id))).has(c.code))
+                    : currentPage.criteria
+                  )
+                )
+              ).map(([principle, criteria]) => {
                 const stats = getPrincipleStats(criteria);
                 return (
                   <AccordionItem key={principle} value={principle} className="border rounded-lg px-4">
