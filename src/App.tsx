@@ -18,6 +18,7 @@ import MyAccount from "./pages/MyAccount";
 import RolesUsers from "./pages/RolesUsers";
 import Contact from "./pages/Contact";
 import RecalculateScores from "./pages/RecalculateScores";
+import UpdateNativeAppAudits from "./pages/UpdateNativeAppAudits";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ const App = () => (
                       <Route path="/roles-users" element={<RolesUsers />} />
                       <Route path="/contact" element={<Contact />} />
                       <Route path="/recalculate-scores" element={<RecalculateScores />} />
+                      <Route path="/update-native-app-audits" element={<UpdateNativeAppAudits />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                     <AIChat />
