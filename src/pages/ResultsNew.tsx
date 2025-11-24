@@ -71,8 +71,9 @@ const ResultsNew = () => {
       let notApplicable = 0;
       
       perCodeStatus.forEach((v) => {
-        if (v.hasCompliant) compliant += 1;
-        else if (v.hasNonCompliant) nonCompliant += 1;
+        // Agrégation pessimiste : priorité au non-compliant
+        if (v.hasNonCompliant) nonCompliant += 1;
+        else if (v.hasCompliant) compliant += 1;
         else notApplicable += 1;
       });
       
