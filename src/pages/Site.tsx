@@ -14,7 +14,49 @@ interface Report {
   start_date: string;
   status: string;
   score?: number;
+  audit_type?: string;
+  calculatedScore?: number;
 }
+
+// Calculate score using pessimistic aggregation logic
+const calculatePessimisticScore = (
+  pages: { criteria_results: { code: string; status: string }[] }[],
+  auditType: string
+): number => {
+  const totalCriteria = auditType === 'native-app' ? 41 : 55;
+  
+  // Track criteria status across all pages (pessimistic aggregation)
+  const perCodeStatus = new Map<string, { hasCompliant: boolean; hasNonCompliant: boolean }>();
+  
+  for (const page of pages) {
+    for (const criterion of page.criteria_results || []) {
+      const entry = perCodeStatus.get(criterion.code) || { hasCompliant: false, hasNonCompliant: false };
+      if (criterion.status === 'compliant') entry.hasCompliant = true;
+      if (criterion.status === 'non-compliant') entry.hasNonCompliant = true;
+      perCodeStatus.set(criterion.code, entry);
+    }
+  }
+  
+  // Count compliant and not-applicable criteria
+  const compliantCodes = new Set<string>();
+  const notApplicableCodes = new Set<string>();
+  
+  perCodeStatus.forEach((status, code) => {
+    // Pessimistic aggregation: if non-compliant on at least one page, it's non-compliant overall
+    if (status.hasNonCompliant) {
+      // Not compliant overall
+    } else if (status.hasCompliant) {
+      compliantCodes.add(code);
+    } else {
+      // Never compliant, never non-compliant = not-applicable
+      notApplicableCodes.add(code);
+    }
+  });
+  
+  // Calculate score: unique compliant / (totalCriteria - unique not-applicable) * 100
+  const denominator = totalCriteria - notApplicableCodes.size;
+  return denominator > 0 ? Math.round((compliantCodes.size / denominator) * 100) : 0;
+};
 
 const Site = () => {
   const { siteId } = useParams();
@@ -49,23 +91,36 @@ const Site = () => {
 
   const fetchReports = async () => {
     try {
+      // Fetch reports with their pages and criteria results for score calculation
       const { data, error } = await supabase
         .from('reports')
-        .select('*')
+        .select('*, audit_pages(id, criteria_results(code, status))')
         .eq('site_id', siteId)
         .order('start_date', { ascending: false });
 
       if (error) throw error;
 
-      const completedReports = data?.filter(r => r.status === 'completed') || [];
-      // Get the overall score from the most recent completed report
-      const lastScore = completedReports.length > 0 ? completedReports[0].score || 0 : 0;
+      // Calculate scores for each report using pessimistic aggregation
+      const reportsWithScores = (data || []).map(report => {
+        const calculatedScore = calculatePessimisticScore(
+          report.audit_pages || [],
+          report.audit_type || 'website'
+        );
+        return {
+          ...report,
+          calculatedScore,
+        };
+      });
 
-      setReports(data || []);
+      const completedReports = reportsWithScores.filter(r => r.status === 'completed');
+      // Get the calculated score from the most recent completed report
+      const lastScore = completedReports.length > 0 ? completedReports[0].calculatedScore : 0;
+
+      setReports(reportsWithScores);
       setStats({
-        total: data?.length || 0,
+        total: reportsWithScores.length,
         completed: completedReports.length,
-        lastScore, // This is already the overall score stored in the report
+        lastScore,
       });
     } catch (error: any) {
       toast.error('Failed to fetch reports');
@@ -92,11 +147,11 @@ const Site = () => {
   };
 
   const getScoreProgression = () => {
-    const completed = reports.filter((r) => r.status === 'completed' && r.score !== undefined);
+    const completed = reports.filter((r) => r.status === 'completed' && r.calculatedScore !== undefined);
     if (completed.length < 2) return null;
 
-    const latest = completed[0].score || 0;
-    const previous = completed[1].score || 0;
+    const latest = completed[0].calculatedScore || 0;
+    const previous = completed[1].calculatedScore || 0;
     const diff = latest - previous;
 
     return { diff, isPositive: diff >= 0 };
@@ -104,11 +159,11 @@ const Site = () => {
 
   const getChartData = () => {
     return reports
-      .filter((r) => r.status === 'completed' && r.score !== undefined)
+      .filter((r) => r.status === 'completed' && r.calculatedScore !== undefined)
       .reverse()
       .map((r) => ({
         date: new Date(r.start_date).toLocaleDateString(),
-        score: Math.round(r.score || 0),
+        score: r.calculatedScore || 0,
       }));
   };
 
@@ -237,8 +292,8 @@ const Site = () => {
                     }`}>
                       {report.status}
                     </span>
-                    {report.score !== undefined && report.status === 'completed' && (
-                      <p className="text-2xl font-bold mt-2">{Math.round(report.score)}%</p>
+                    {report.calculatedScore !== undefined && report.status === 'completed' && (
+                      <p className="text-2xl font-bold mt-2">{report.calculatedScore}%</p>
                     )}
                   </div>
                   <Button
