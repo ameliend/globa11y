@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, ArrowLeft, Trash2, Edit } from 'lucide-react';
+import { Plus, ArrowLeft, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
@@ -16,6 +16,46 @@ interface Site {
   url: string;
   latest_score?: number;
 }
+
+// Calculate score using pessimistic aggregation logic
+const calculatePessimisticScore = (
+  pages: { criteria_results: { code: string; status: string }[] }[],
+  auditType: string
+): number => {
+  const totalCriteria = auditType === 'native-app' ? 41 : 55;
+  
+  // Track criteria status across all pages (pessimistic aggregation)
+  const perCodeStatus = new Map<string, { hasCompliant: boolean; hasNonCompliant: boolean }>();
+  
+  for (const page of pages) {
+    for (const criterion of page.criteria_results || []) {
+      const entry = perCodeStatus.get(criterion.code) || { hasCompliant: false, hasNonCompliant: false };
+      if (criterion.status === 'compliant') entry.hasCompliant = true;
+      if (criterion.status === 'non-compliant') entry.hasNonCompliant = true;
+      perCodeStatus.set(criterion.code, entry);
+    }
+  }
+  
+  // Count compliant and not-applicable criteria
+  const compliantCodes = new Set<string>();
+  const notApplicableCodes = new Set<string>();
+  
+  perCodeStatus.forEach((status, code) => {
+    // Pessimistic aggregation: if non-compliant on at least one page, it's non-compliant overall
+    if (status.hasNonCompliant) {
+      // Not compliant overall
+    } else if (status.hasCompliant) {
+      compliantCodes.add(code);
+    } else {
+      // Never compliant, never non-compliant = not-applicable
+      notApplicableCodes.add(code);
+    }
+  });
+  
+  // Calculate score: unique compliant / (totalCriteria - unique not-applicable) * 100
+  const denominator = totalCriteria - notApplicableCodes.size;
+  return denominator > 0 ? Math.round((compliantCodes.size / denominator) * 100) : 0;
+};
 
 const Entity = () => {
   const { entityId } = useParams();
@@ -62,22 +102,29 @@ const Entity = () => {
 
       if (error) throw error;
 
-      // For each site, fetch the latest completed report score
+      // For each site, fetch the latest completed report and calculate score pessimistically
       const sitesWithScores = await Promise.all(
         (sitesData || []).map(async (site) => {
           const { data: reportData } = await supabase
             .from('reports')
-            .select('score')
+            .select('*, audit_pages(id, criteria_results(code, status))')
             .eq('site_id', site.id)
             .eq('status', 'completed')
-            .not('score', 'is', null)
             .order('start_date', { ascending: false })
             .limit(1)
             .maybeSingle();
 
+          let latest_score: number | undefined;
+          if (reportData) {
+            latest_score = calculatePessimisticScore(
+              reportData.audit_pages || [],
+              reportData.audit_type || 'website'
+            );
+          }
+
           return {
             ...site,
-            latest_score: reportData?.score,
+            latest_score,
           };
         })
       );
