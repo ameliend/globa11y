@@ -4,7 +4,10 @@ project_id = "macstakqnfwffcwcgrtf"
 verify_jwt = true
 
 [functions.create-user]
-verify_jwt = false
+verify_jwt = true
 
 [functions.recalculate-audit-scores]
-verify_jwt = false
+verify_jwt = true
+
+[functions.admin-reset-password]
+verify_jwt = true
