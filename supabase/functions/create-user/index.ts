@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { email, role, entityIds = [] } = await req.json();
+    const { email, role, entityIds = [], password: providedPassword } = await req.json();
     
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -22,13 +22,22 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Validate role
+    const validRoles = ['owner', 'editor', 'reader'];
+    if (!role || !validRoles.includes(role)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid role. Must be owner, editor, or reader' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Generate a secure random password (16 characters with mixed case, numbers, and symbols)
+    // Generate a secure random password if not provided (16 characters with mixed case, numbers, and symbols)
     const generateSecurePassword = () => {
       const length = 16;
       const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
@@ -37,12 +46,13 @@ serve(async (req) => {
       return Array.from(array, byte => charset[byte % charset.length]).join('');
     };
 
-    const temporaryPassword = generateSecurePassword();
+    const password = providedPassword || generateSecurePassword();
+    const sendResetEmail = !providedPassword; // Only send reset email if no password was provided
 
-    // Create user with temporary random password
+    // Create user with password
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: temporaryPassword,
+      password,
       email_confirm: true,
     });
 
@@ -66,24 +76,28 @@ serve(async (req) => {
         .from('user_entity_permissions')
         .insert(permissions);
 
-    if (permError) throw permError;
+      if (permError) throw permError;
     }
 
-    // Send password reset email to allow user to set their own password
-    const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-      redirectTo: `${req.headers.get('origin')}/auth`,
-    });
+    // Send password reset email only if no password was provided
+    if (sendResetEmail) {
+      const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+        redirectTo: `${req.headers.get('origin')}/auth`,
+      });
 
-    if (resetError) {
-      console.error('Password reset email error:', resetError);
-      // Don't fail the user creation, just log the error
+      if (resetError) {
+        console.error('Password reset email error:', resetError);
+        // Don't fail the user creation, just log the error
+      }
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         userId: userData.user.id,
-        message: 'User created successfully. Password reset email sent.'
+        message: sendResetEmail 
+          ? 'User created successfully. Password reset email sent.'
+          : 'User created successfully with the provided password.'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
