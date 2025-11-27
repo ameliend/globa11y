@@ -137,8 +137,8 @@ const Entity = () => {
 
   const handleCreateSite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!siteName.trim() || !siteUrl.trim()) {
-      toast.error('Please fill all fields');
+    if (!siteName.trim()) {
+      toast.error('Please enter a site name');
       return;
     }
 
