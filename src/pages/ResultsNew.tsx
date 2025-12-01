@@ -134,41 +134,49 @@ const ResultsNew = () => {
   const generateAccessibilityStatement = (data: AccessibilityStatementData) => {
     const isNative = report.audit_type === 'native-app';
     const allowedSet = isNative ? new Set(wcagCriteriaNativeApp.map(c => c.ref_id)) : null;
-    // Calculate detailed statistics by level - count unique criteria codes
-    const compliantCodesA = new Set<string>();
-    const compliantCodesAA = new Set<string>();
-    const nonCompliantCodesA = new Set<string>();
-    const nonCompliantCodesAA = new Set<string>();
-    const notApplicableCodesA = new Set<string>();
-    const notApplicableCodesAA = new Set<string>();
+    
+    // Get number of A and AA criteria for the audit type
+    const criteriaCountA = isNative 
+      ? wcagCriteriaNativeApp.filter(c => c.level === 'A').length 
+      : 32;
+    const criteriaCountAA = isNative 
+      ? wcagCriteriaNativeApp.filter(c => c.level === 'AA').length 
+      : 23;
+    
+    // Calculate using pessimistic aggregation (same as overall stats)
+    const perCodeStatusA = new Map<string, { hasCompliant: boolean; hasNonCompliant: boolean; seen: boolean }>();
+    const perCodeStatusAA = new Map<string, { hasCompliant: boolean; hasNonCompliant: boolean; seen: boolean }>();
     
     pages.forEach(page => {
       page.criteria_results.forEach((c: any) => {
-        if (c.status === 'compliant') {
-          if (c.level === 'A') compliantCodesA.add(c.code);
-          if (c.level === 'AA') compliantCodesAA.add(c.code);
-        }
-        if (c.status === 'non-compliant') {
-          if (c.level === 'A') nonCompliantCodesA.add(c.code);
-          if (c.level === 'AA') nonCompliantCodesAA.add(c.code);
-        }
-        if (c.status === 'not-applicable') {
-          if (c.level === 'A') notApplicableCodesA.add(c.code);
-          if (c.level === 'AA') notApplicableCodesAA.add(c.code);
-        }
+        if (isNative && !(allowedSet as Set<string>).has(c.code)) return;
+        const map = c.level === 'A' ? perCodeStatusA : perCodeStatusAA;
+        const entry = map.get(c.code) || { hasCompliant: false, hasNonCompliant: false, seen: false };
+        if (c.status === 'compliant') entry.hasCompliant = true;
+        if (c.status === 'non-compliant') entry.hasNonCompliant = true;
+        entry.seen = true;
+        map.set(c.code, entry);
       });
     });
     
-    const compliantA = compliantCodesA.size;
-    const compliantAA = compliantCodesAA.size;
+    // Pessimistic aggregation per level
+    let compliantA = 0, nonCompliantA = 0, notApplicableA = 0;
+    let compliantAA = 0, nonCompliantAA = 0, notApplicableAA = 0;
+    
+    perCodeStatusA.forEach((v) => {
+      if (v.hasNonCompliant) nonCompliantA += 1;
+      else if (v.hasCompliant) compliantA += 1;
+      else notApplicableA += 1;
+    });
+    
+    perCodeStatusAA.forEach((v) => {
+      if (v.hasNonCompliant) nonCompliantAA += 1;
+      else if (v.hasCompliant) compliantAA += 1;
+      else notApplicableAA += 1;
+    });
+    
     const totalCompliant = stats.compliant;
-    
-    const nonCompliantA = nonCompliantCodesA.size;
-    const nonCompliantAA = nonCompliantCodesAA.size;
     const totalNonCompliant = stats.nonCompliant;
-    
-    const notApplicableA = notApplicableCodesA.size;
-    const notApplicableAA = notApplicableCodesAA.size;
     const totalNotApplicable = stats.notApplicable;
     
     // Calculate percentages by level (only for applicable criteria)
@@ -179,6 +187,9 @@ const ResultsNew = () => {
     const percentCompliantAA = totalApplicableAA > 0 ? Math.round((compliantAA / totalApplicableAA) * 100) : 0;
     const overallDenominator = totalCriteria - stats.notApplicable;
     const percentCompliant = overallDenominator > 0 ? Math.round((stats.compliant / overallDenominator) * 100) : 0;
+    
+    // Standard name based on audit type
+    const standardName = isNative ? 'EN 301 549 & RAAM' : 'WCAG';
     
     // Generate page list
     const pageList = pages.map(p => `<li>${p.name}</li>`).join('\n');
@@ -222,7 +233,7 @@ const ResultsNew = () => {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WCAG Accessibility Audit Template</title>
+<title>${standardName} Accessibility Audit Template</title>
 <style>
 body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;line-height:1.45;color:#111;padding:24px;background:#f7f7f8}
 header{background:#fff;border-radius:12px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
@@ -271,13 +282,13 @@ function downloadPDF() {
   <button class="download-btn" onclick="downloadPDF()">Download PDF</button>
 </div>
 <header>
-<h1>WCAG Accessibility Audit</h1>
+<h1>${standardName} Accessibility Audit</h1>
 <div class="meta">
 <div class="card"><strong>Service :</strong> <span id="project-name">CANAL+</span></div>
 <div class="card"><strong>Page / URL:</strong> <span id="page-url">${report.sites.url}</span></div>
 <div class="card"><strong>Auditor:</strong> <span id="tester">${data.auditorName}</span></div>
 <div class="card"><strong>Date:</strong> <span id="date">${today}</span></div>
-<div class="card"><strong>Target WCAG Level:</strong> <span id="level">A / AA </span></div>
+<div class="card"><strong>Target ${standardName} Level:</strong> <span id="level">A / AA </span></div>
 </div>
 </header>
 
@@ -301,7 +312,7 @@ function downloadPDF() {
 <p class="small">Brief overview of the results, overall compliance level, and critical issues.</p>
 <p><strong>Estimated compliance level:</strong> ${percentCompliant}% level A-AA</p>
 <table class="summary-table">
-    <caption>Synthesis by WCAG conformance levels</caption>
+    <caption>Synthesis by ${standardName} conformance levels</caption>
     <thead>
       <tr>
         <th scope="col">Level</th>
@@ -313,9 +324,9 @@ function downloadPDF() {
     <tbody>
       <tr>
         <th scope="row">Number of criteria</th>
-        <td>32</td>
-        <td>23</td>
-        <td>55</td>
+        <td>${criteriaCountA}</td>
+        <td>${criteriaCountAA}</td>
+        <td>${totalCriteria}</td>
       </tr>
       <tr>
         <th scope="row">Compliant</th>
@@ -345,7 +356,7 @@ function downloadPDF() {
   </table>
 
    <table class="page-table">
-    <caption>Criteria results by page and WCAG level</caption>
+    <caption>Criteria results by page and ${standardName} level</caption>
     <thead>
       <tr>
         <th scope="col">Page</th>
@@ -368,7 +379,7 @@ ${pageRows}
 
 <section class="card" aria-labelledby="ux-heading">
 <h2 id="ux-heading">3. Inaccessible content</h2>
-<p>All non-conformities are identified and taken into account by the teams concerned. Here is the list of non-compliant WCAG criteria:</p>
+<p>All non-conformities are identified and taken into account by the teams concerned. Here is the list of non-compliant ${standardName} criteria:</p>
 <ul>
 ${nonCompliantList}
 </ul>

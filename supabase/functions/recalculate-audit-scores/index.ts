@@ -6,6 +6,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Native App allowed criteria (41 total)
+const nativeAppCriteria = new Set([
+  '1.1.1', '1.2.1', '1.2.2', '1.2.3', '1.2.4', '1.2.5',
+  '3.14', '3.15', '3.16', '3.17',
+  '1.3.1', '1.3.2', '1.3.3', '1.3.4', '1.3.5',
+  '1.4.1', '1.4.2', '1.4.3', '1.4.4', '1.4.5', '1.4.10', '1.4.11', '1.4.12', '1.4.13',
+  '2.1.1', '2.1.2', '2.1.4', '2.2.1', '2.2.2', '2.3.1', '2.4.3', '2.4.4', '2.4.6', '2.4.7',
+  '2.5.1', '2.5.2', '2.5.3', '2.5.4',
+  '3.1.1', '3.2.1', '3.2.2', '3.3.1', '3.3.2', '3.3.3', '3.3.4',
+  '4.1.1', '4.1.2', '4.1.3'
+]);
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -26,7 +38,8 @@ serve(async (req) => {
     const updates = [];
     
     for (const report of reports || []) {
-      const totalCriteria = report.audit_type === 'native-app' ? 41 : 55;
+      const isNative = report.audit_type === 'native-app';
+      const totalCriteria = isNative ? 41 : 55;
       
       // Track criteria status across all pages (pessimistic aggregation)
       const perCodeStatus = new Map<string, { hasCompliant: boolean; hasNonCompliant: boolean }>();
@@ -35,6 +48,9 @@ serve(async (req) => {
         for (const page of report.audit_pages) {
           if (page.criteria_results && Array.isArray(page.criteria_results)) {
             for (const criterion of page.criteria_results) {
+              // Filter to only allowed criteria for native-app
+              if (isNative && !nativeAppCriteria.has(criterion.code)) continue;
+              
               const entry = perCodeStatus.get(criterion.code) || { hasCompliant: false, hasNonCompliant: false };
               if (criterion.status === 'compliant') entry.hasCompliant = true;
               if (criterion.status === 'non-compliant') entry.hasNonCompliant = true;
