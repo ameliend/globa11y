@@ -9,6 +9,7 @@ import { Plus, ArrowLeft, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
+import { wcagCriteriaNativeApp } from '@/data/wcagCriteriaNativeApp';
 
 interface Site {
   id: string;
@@ -22,13 +23,18 @@ const calculatePessimisticScore = (
   pages: { criteria_results: { code: string; status: string }[] }[],
   auditType: string
 ): number => {
-  const totalCriteria = auditType === 'native-app' ? 41 : 55;
+  const isNative = auditType === 'native-app';
+  const totalCriteria = isNative ? 41 : 55;
+  const allowedSet = isNative ? new Set(wcagCriteriaNativeApp.map(c => c.ref_id)) : null;
   
   // Track criteria status across all pages (pessimistic aggregation)
   const perCodeStatus = new Map<string, { hasCompliant: boolean; hasNonCompliant: boolean }>();
   
   for (const page of pages) {
     for (const criterion of page.criteria_results || []) {
+      // Filter to only allowed criteria for native-app
+      if (isNative && !allowedSet!.has(criterion.code)) continue;
+      
       const entry = perCodeStatus.get(criterion.code) || { hasCompliant: false, hasNonCompliant: false };
       if (criterion.status === 'compliant') entry.hasCompliant = true;
       if (criterion.status === 'non-compliant') entry.hasNonCompliant = true;
