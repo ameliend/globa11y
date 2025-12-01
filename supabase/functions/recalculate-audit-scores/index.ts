@@ -76,8 +76,10 @@ serve(async (req) => {
         }
       });
       
-      // Calculate new score: unique compliant / (totalCriteria - unique not-applicable) * 100
-      const denominator = totalCriteria - notApplicableCodes.size;
+      // Calculate new score: unique compliant / (compliant + nonCompliant) * 100
+      // We use only applicable criteria (compliant + nonCompliant) as denominator
+      const nonCompliantCount = perCodeStatus.size - compliantCodes.size - notApplicableCodes.size;
+      const denominator = compliantCodes.size + nonCompliantCount;
       const newScore = denominator > 0 ? Math.round((compliantCodes.size / denominator) * 100) : 0;
       
       // Update the report score
