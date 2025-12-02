@@ -185,7 +185,8 @@ const ResultsNew = () => {
     
     const percentCompliantA = totalApplicableA > 0 ? Math.round((compliantA / totalApplicableA) * 100) : 0;
     const percentCompliantAA = totalApplicableAA > 0 ? Math.round((compliantAA / totalApplicableAA) * 100) : 0;
-    const overallDenominator = totalCriteria - stats.notApplicable;
+    // Use same formula as overall score: compliant / (compliant + nonCompliant) * 100
+    const overallDenominator = stats.compliant + stats.nonCompliant;
     const percentCompliant = overallDenominator > 0 ? Math.round((stats.compliant / overallDenominator) * 100) : 0;
     
     // Standard name based on audit type
@@ -210,8 +211,9 @@ const ResultsNew = () => {
       const pageNotApplicableA = pageCriteria.filter((c: any) => c.status === 'not-applicable' && c.level === 'A').length;
       const pageNotApplicableAA = pageCriteria.filter((c: any) => c.status === 'not-applicable' && c.level === 'AA').length;
       const pageCompliantCount = pageCriteria.filter((c: any) => c.status === 'compliant').length;
-      const pageNotApplicableCount = pageCriteria.filter((c: any) => c.status === 'not-applicable').length;
-      const pageDenominator = totalCriteria - pageNotApplicableCount;
+      const pageNonCompliantCount = pageCriteria.filter((c: any) => c.status === 'non-compliant').length;
+      // Use same formula: compliant / (compliant + nonCompliant) * 100
+      const pageDenominator = pageCompliantCount + pageNonCompliantCount;
       const pagePercent = pageDenominator > 0 ? Math.round((pageCompliantCount / pageDenominator) * 100) : 0;
       
       return `      <tr>

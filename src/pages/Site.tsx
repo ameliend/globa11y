@@ -59,8 +59,9 @@ const calculatePessimisticScore = (
     }
   });
   
-  // Calculate score: unique compliant / (totalCriteria - unique not-applicable) * 100
-  const denominator = totalCriteria - notApplicableCodes.size;
+  // Calculate score: unique compliant / (compliant + nonCompliant) * 100
+  const nonCompliantCount = perCodeStatus.size - compliantCodes.size - notApplicableCodes.size;
+  const denominator = compliantCodes.size + nonCompliantCount;
   return denominator > 0 ? Math.round((compliantCodes.size / denominator) * 100) : 0;
 };
 
