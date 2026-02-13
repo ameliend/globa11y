@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Plus, ExternalLink, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
+import { ArrowLeft, Plus, ExternalLink, Trash2, TrendingUp, TrendingDown, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
@@ -150,6 +150,75 @@ const Site = () => {
       fetchReports();
     } catch (error: any) {
       toast.error('Failed to delete report');
+    }
+  };
+
+  const handleDuplicateReport = async (reportId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      // Fetch the report
+      const { data: report, error: reportError } = await supabase
+        .from('reports')
+        .select('*')
+        .eq('id', reportId)
+        .single();
+      if (reportError || !report) throw reportError;
+
+      // Create duplicated report
+      const { data: newReport, error: insertError } = await supabase
+        .from('reports')
+        .insert({
+          site_id: report.site_id,
+          name: `${report.name} (copy)`,
+          start_date: report.start_date,
+          status: report.status,
+          score: report.score,
+          audit_type: report.audit_type,
+          auditor_name: report.auditor_name,
+          assistive_tech: report.assistive_tech,
+          automated_tests: report.automated_tests,
+          browsers_devices: report.browsers_devices,
+          technologies: report.technologies,
+        })
+        .select()
+        .single();
+      if (insertError || !newReport) throw insertError;
+
+      // Fetch pages and their criteria
+      const { data: pages, error: pagesError } = await supabase
+        .from('audit_pages')
+        .select('*, criteria_results(*)')
+        .eq('report_id', reportId);
+      if (pagesError) throw pagesError;
+
+      // Duplicate pages and criteria
+      for (const page of pages || []) {
+        const { data: newPage, error: pageError } = await supabase
+          .from('audit_pages')
+          .insert({ report_id: newReport.id, name: page.name })
+          .select()
+          .single();
+        if (pageError || !newPage) throw pageError;
+
+        const criteria = (page as any).criteria_results || [];
+        if (criteria.length > 0) {
+          await supabase.from('criteria_results').insert(
+            criteria.map((c: any) => ({
+              page_id: newPage.id,
+              code: c.code,
+              title: c.title,
+              level: c.level,
+              status: c.status,
+              observation: c.observation,
+            }))
+          );
+        }
+      }
+
+      toast.success('Report duplicated successfully');
+      fetchReports();
+    } catch (error: any) {
+      toast.error('Failed to duplicate report');
     }
   };
 
@@ -303,6 +372,15 @@ const Site = () => {
                       <p className="text-2xl font-bold mt-2">{report.calculatedScore}%</p>
                     )}
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="hover:bg-transparent"
+                    onClick={(e) => handleDuplicateReport(report.id, e)}
+                    title="Duplicate report"
+                  >
+                    <Copy className="h-4 w-4 text-muted-foreground" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
