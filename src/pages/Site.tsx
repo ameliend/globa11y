@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Plus, ExternalLink, Trash2, TrendingUp, TrendingDown, Copy } from 'lucide-react';
+import { ArrowLeft, Plus, ExternalLink, Trash2, TrendingUp, TrendingDown, Copy, Pencil, Check, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
@@ -75,6 +76,23 @@ const Site = () => {
     open: false,
     reportId: null,
   });
+  const [editingReportId, setEditingReportId] = useState<string | null>(null);
+  const [editingReportName, setEditingReportName] = useState('');
+
+  const handleSaveReportName = async (reportId: string) => {
+    try {
+      const { error } = await supabase
+        .from('reports')
+        .update({ name: editingReportName })
+        .eq('id', reportId);
+      if (error) throw error;
+      setReports(reports.map(r => r.id === reportId ? { ...r, name: editingReportName } : r));
+      setEditingReportId(null);
+      toast.success('Titre mis à jour');
+    } catch {
+      toast.error('Échec de la mise à jour du titre');
+    }
+  };
 
   useEffect(() => {
     fetchSite();
@@ -354,7 +372,28 @@ const Site = () => {
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div className="flex-1">
-                  <CardTitle>{report.name}</CardTitle>
+                  {editingReportId === report.id ? (
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <Input
+                        value={editingReportName}
+                        onChange={(e) => setEditingReportName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveReportName(report.id);
+                          if (e.key === 'Escape') setEditingReportId(null);
+                        }}
+                        className="h-8 text-lg font-semibold"
+                        autoFocus
+                      />
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleSaveReportName(report.id)}>
+                        <Check className="h-4 w-4 text-success" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingReportId(null)}>
+                        <X className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <CardTitle>{report.name}</CardTitle>
+                  )}
                   <CardDescription>
                     {new Date(report.start_date).toLocaleDateString()}
                   </CardDescription>
@@ -372,6 +411,19 @@ const Site = () => {
                       <p className="text-2xl font-bold mt-2">{report.calculatedScore}%</p>
                     )}
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="hover:bg-transparent"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingReportId(report.id);
+                      setEditingReportName(report.name);
+                    }}
+                    title="Rename report"
+                  >
+                    <Pencil className="h-4 w-4 text-muted-foreground" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
