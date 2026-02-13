@@ -346,7 +346,26 @@ const Audit = () => {
         </Button>
 
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Audit : {report.name}</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-3xl font-bold text-foreground">Audit :</span>
+            <Input
+              value={report.name}
+              onChange={(e) => setReport({ ...report, name: e.target.value })}
+              onBlur={async () => {
+                try {
+                  const { error } = await supabase
+                    .from('reports')
+                    .update({ name: report.name })
+                    .eq('id', reportId);
+                  if (error) throw error;
+                  toast.success('Titre mis à jour');
+                } catch {
+                  toast.error('Échec de la mise à jour du titre');
+                }
+              }}
+              className="text-3xl font-bold h-auto py-1 border-dashed"
+            />
+          </div>
           <p className="text-muted-foreground">{report.sites.url}</p>
           <Badge variant="outline" className="mt-2">
             {report.audit_type === 'native-app' ? 'Native App (41 critères)' : 'Website (55 critères)'}
